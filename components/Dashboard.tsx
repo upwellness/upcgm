@@ -12,6 +12,7 @@ import GlucoseChart from './GlucoseChart';
 import { IconAlert, IconCalendar, IconImage, IconInfo, IconSparkle, IconUpload } from './Icons';
 import MealPanel, { type MealPatternView } from './MealPanel';
 import { MetricGrid, RangeBar, SpanStrip } from './Metrics';
+import EventExplorer, { type CgmEventView, type EventSnapshotView } from './EventExplorer';
 import PatternPanel, { type PatternSnapshotView } from './PatternPanel';
 import Uploader from './Uploader';
 
@@ -23,6 +24,8 @@ interface AiResponse {
     escalate: boolean;
     patterns: PatternSnapshotView | null;
     perMeal: MealPatternView[];
+    events: CgmEventView[];
+    eventSnapshot: EventSnapshotView;
   };
   narrative?: string | null;
   reasonTh?: string | null;
@@ -251,9 +254,13 @@ export default function Dashboard() {
                 )}
               </section>
 
-              {interp?.patterns && interp.patterns.judged + interp.patterns.thinData + interp.patterns.betweenShapes > 0 && (
+              {interp?.eventSnapshot && interp.events.length > 0 && (
                 <section className="mt-5">
-                  <PatternPanel snap={interp.patterns} />
+                  <EventExplorer
+                    snap={interp.eventSnapshot}
+                    events={interp.events}
+                    readings={readings}
+                  />
                 </section>
               )}
 

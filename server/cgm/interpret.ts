@@ -3,6 +3,7 @@ import { fmtDuration, fmtThaiDate, fmtTime, pctToMinutesPerDay } from '@/lib/tim
 import { readingsFromWire } from '@/lib/meal-response';
 import { DEVICE_FLOOR, TARGETS_ADULT_DIABETES, gateForWindow } from './thresholds';
 import { PATTERNS, analysePatterns, type MealPattern, type PatternSnapshot } from './patterns';
+import { analyseEvents, type CgmEvent, type EventSnapshot } from './excursions';
 
 /**
  * Turning numbers into sentences is where a tool like this either earns trust or
@@ -38,10 +39,14 @@ export interface Interpretation {
   limitationsTh: string[];
   /** true when the session must lead with "see the prescriber", not with advice */
   escalate: boolean;
-  /** พุ่ง/กว้าง/ค้าง/ตก rollup — null when no meals were marked at all */
+  /** พุ่ง/กว้าง/ค้าง/ตก rollup over the meals the coach marked */
   patterns: PatternSnapshot | null;
   /** per-meal verdicts, so the meal list can show a badge next to each row */
   perMeal: MealPattern[];
+  /** every rise in the window — marked meals plus ones the scan found itself */
+  events: CgmEvent[];
+  /** rollup over `events`; this is the one the screen leads with */
+  eventSnapshot: EventSnapshot;
 }
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -187,7 +192,14 @@ export function interpret(
   // Runs off the full series, not the paired subset, because a marker with too
   // little data around it still deserves an honest "cannot tell" rather than
   // being silently dropped.
-  const readings = readingsFromWire(result.series);
+  // `series` is always the whole wear, while `metrics` has already been swapped
+  // for the selected window's. Scanning the raw series would report rises from
+  // days the coach is not looking at, against a headline computed from a week —
+  // so the scan is clipped to the same window everything else on screen uses.
+  // The tail is kept whole: an event that starts inside the window needs its
+  // full three hours to be classified, even if they run past the edge.
+  const readings = readingsFromWire(result.series)
+    .filter((r) => r.t >= m.firstT && r.t <= m.lastT + 240);
   const { perMeal, snapshot } = analysePatterns(
     opts.markers ?? [],
     opts.responses ?? [],
@@ -196,31 +208,40 @@ export function interpret(
   );
   const patterns = (opts.markers ?? []).length > 0 ? snapshot : null;
 
-  if (patterns && patterns.crashNeedsPrescriber) {
+  // The whole-window scan. Runs on every window so a coach who has marked
+  // nothing still gets something to look at — which is the normal case.
+  const { events, snapshot: eventSnapshot } = analyseEvents(
+    readings, opts.markers ?? [],
+    { medsLowering: opts.meds === 'yes', onsetCutoff: m.lastT },
+  );
+
+  if (eventSnapshot.crashNeedsPrescriber) {
     // A post-meal low in someone on a glucose-lowering medicine is not a meal
     // to coach around. It goes back to whoever wrote the prescription.
     escalate = true;
     findings.push({
       id: 'pattern-crash-meds',
       severity: 'urgent',
-      titleTh: 'เจอรูปแบบ “ตก” หลังมื้ออาหาร ในเคสที่ใช้ยาลดน้ำตาลอยู่',
-      evidenceTh: `${patterns.counts.crash} มื้อที่หลังยอดแล้วลงต่ำกว่าระดับก่อนกินเกิน ${'15'} มก./ดล.`,
+      titleTh: 'เจอรูปแบบ “ตก” ในเคสที่ใช้ยาลดน้ำตาลอยู่',
+      evidenceTh: `${eventSnapshot.counts.crash} ช่วงที่หลังยอดแล้วลงต่ำกว่าระดับก่อนขึ้นเกิน 15 มก./ดล.`,
       actionTh: 'หยุดปรับอาหารเองก่อน แล้วส่งกราฟให้แพทย์ผู้สั่งยาดู — ช่วงต่ำในคนที่ใช้ยาอยู่เป็นเรื่องของขนาดยา ไม่ใช่เรื่องที่โค้ชแก้ด้วยเมนู',
       basis: 'house',
     });
   }
 
-  if (patterns?.dominant) {
-    const d = PATTERNS[patterns.dominant];
+  if (eventSnapshot.dominant) {
+    const d = PATTERNS[eventSnapshot.dominant];
+    const worst = events
+      .filter((e) => e.pattern.primary === eventSnapshot.dominant)
+      .sort((a, b) => (b.pattern.metrics.delta ?? 0) - (a.pattern.metrics.delta ?? 0))[0];
     findings.push({
-      id: `pattern-${patterns.dominant}`,
-      severity: patterns.dominant === 'crash' ? 'attention' : 'watch',
+      id: `pattern-${eventSnapshot.dominant}`,
+      severity: eventSnapshot.dominant === 'crash' ? 'attention' : 'watch',
       titleTh: `รูปร่างกราฟที่เจอบ่อยที่สุดคือ “${d.labelTh}” — ${d.meaningTh}`,
       evidenceTh:
-        `${patterns.counts[patterns.dominant]} จาก ${patterns.judged} มื้อที่ข้อมูลพอจะอ่านรูปร่างได้` +
-        (patterns.thinData > 0 ? ` (อีก ${patterns.thinData} มื้อข้อมูลไม่พอ)` : '') +
-        (patterns.betweenShapes > 0 ? ` (อีก ${patterns.betweenShapes} มื้ออยู่กลาง ๆ ระหว่างแบบ)` : '') +
-        ` · ${patterns.examples[0] ? `เช่น “${patterns.examples[0].labelTh}” ${patterns.examples[0].whenTh} — ${patterns.examples[0].evidenceTh}` : ''}`,
+        `${eventSnapshot.counts[eventSnapshot.dominant]} จาก ${eventSnapshot.judged} ช่วงที่น้ำตาลขึ้นและอ่านรูปร่างได้ ` +
+        `(สแกนทั้งช่วงเวลาที่เลือก ไม่ใช่เฉพาะมื้อที่บันทึกไว้)` +
+        (worst ? ` · แรงที่สุดคือ ${worst.labelTh ? `“${worst.labelTh}” ` : ''}${worst.whenTh} — ${worst.pattern.hits[0]?.evidenceTh ?? ''}` : ''),
       actionTh: `${d.firstMoveTh} — แก้ทีละแบบ แบบที่เด่นที่สุดก่อน แล้วอีก 2–3 วันมาเทียบกราฟกัน`,
       basis: 'house',
     });
@@ -290,14 +311,26 @@ export function interpret(
     limitationsTh.push('ยังไม่ได้ระบุว่าเคสใช้ยาลดน้ำตาลอยู่หรือไม่ — ข้อสรุปเรื่องช่วงน้ำตาลต่ำจึงตีความได้จำกัด');
   }
 
-  if (patterns && patterns.judged > 0) {
+  if (eventSnapshot.judged > 0) {
     limitationsTh.push(
       'ชื่อรูปร่างกราฟ (พุ่ง · กว้าง · ค้าง · ตก) เป็นคำที่ทีมตั้งขึ้นเองเพื่อสอนให้จำง่าย ไม่ใช่ศัพท์ทางการแพทย์ และเกณฑ์ที่ใช้แบ่งก็เป็นเกณฑ์ของทีมเอง',
     );
   }
+  if (eventSnapshot.detected > 0) {
+    // The single most important caveat on this screen. A rise found by the scan
+    // is a rise, full stop — not a meal. Saying otherwise hands a coach a story
+    // about food for something that may have been dawn, illness or a hard run.
+    limitationsTh.push(
+      `ช่วงที่น้ำตาลขึ้น ${eventSnapshot.detected} ครั้งมาจากการสแกนกราฟ ไม่ใช่มื้อที่ใครบันทึกไว้ — ` +
+      'ยืนยันไม่ได้ว่ามาจากอาหาร น้ำตาลขึ้นเองได้ตอนเช้ามืด ตอนป่วย ตอนเครียด และหลังออกกำลังกายหนัก' +
+      (eventSnapshot.overnightCount > 0
+        ? ` (ในจำนวนนี้ ${eventSnapshot.overnightCount} ครั้งเกิดช่วง 00:00–06:00 ซึ่งมักไม่ใช่มื้ออาหาร)`
+        : ''),
+    );
+  }
 
   const headlineTh = buildHeadline(m, gate.showRangePercents, escalate);
-  return { headlineTh, findings, limitationsTh, escalate, patterns, perMeal };
+  return { headlineTh, findings, limitationsTh, escalate, patterns, perMeal, events, eventSnapshot };
 }
 
 function buildHeadline(

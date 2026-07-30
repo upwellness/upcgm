@@ -81,7 +81,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```bash
 npm run dev        # localhost:4321
-npm test           # 124 tests
+npm test           # 139 tests
 npm run test:tz    # รันซ้ำใน UTC + Asia/Bangkok — เวลาเป็นจุดที่พลาดง่ายที่สุด
 npm run typecheck
 npm run build
@@ -111,6 +111,7 @@ server/              ไม่เคยส่งไป client
   cgm/metrics.ts     mean/SD(n−1)/CV/GMI/TIR/AGP/low events
   cgm/window.ts      สรุปรายช่วง + gate ว่าช่วงนี้แสดงตัวเลขอะไรได้
   cgm/patterns.ts    จัดกลุ่มรูปกราฟหลังมื้อเป็น พุ่ง/กว้าง/ค้าง/ตก + สรุปภาพรวม
+  cgm/excursions.ts  สแกนหาช่วงที่น้ำตาลขึ้นเองทั้งไฟล์ (ไม่ต้องรอโค้ชมาร์ก) แล้วส่งให้ patterns จัดกลุ่ม
   cgm/interpret.ts   ตัวเลข → ประโยคไทย · ทุกข้อมีที่มา · ห้ามพูดถึงยา/สินค้า
 components/          UI (glass · UP Wellness CI · responsive ตั้งแต่ 320px)
 ```

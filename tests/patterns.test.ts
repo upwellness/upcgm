@@ -227,7 +227,9 @@ describe('wired into the findings a coach reads', () => {
     const f = out.findings.find((x) => x.id === 'pattern-spike');
     expect(f).toBeTruthy();
     expect(f!.basis).toBe('house');
-    expect(f!.evidenceTh).toContain('มื้อที่ข้อมูลพอ');
+    // the finding now speaks for the whole-window scan, not only marked meals
+    expect(f!.evidenceTh).toContain('ช่วงที่น้ำตาลขึ้นและอ่านรูปร่างได้');
+    expect(f!.evidenceTh).toContain('สแกนทั้งช่วงเวลาที่เลือก');
   });
 
   it('says on the sheet that the four words are ours, not medicine’s', () => {
