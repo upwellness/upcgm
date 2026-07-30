@@ -12,7 +12,8 @@ import { presetWindows } from './window';
  * different id so one client's markers can never land on another's chart.
  *
  * Deliberately not derived from the filename: real downloads arrive as
- * `OttaiCGM_B0E8E8C17030 (1).xlsx` and would look like a new device.
+ * `OttaiCGM_<sensor-id> (1).xlsx` — the copy suffix alone would make the same
+ * wear look like a new device.
  */
 function fingerprint(readings: Reading[]): string {
   const sum = readings.reduce((acc, r) => acc + r.v, 0);
