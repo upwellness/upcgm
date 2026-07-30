@@ -118,6 +118,13 @@ components/          UI (glass · UP Wellness CI · responsive ตั้งแ�
   ไม่งั้นได้รูปกว้าง 686px แทน 1588px
 - **html2canvas จัด text ใน `display:grid` ไม่ได้** — ตัวเลขในวงกลมหลุดออกไปมุมซ้ายบน
   ใช้ inline SVG แทนถ้าต้องการข้อความกลางวงกลม
+- **SheetJS ที่ npm ค้างอยู่ที่ 0.18.5** ซึ่งมีช่องโหว่ Prototype Pollution + ReDoS และ **ไม่มี fix บน npm**
+  เวอร์ชันที่แก้แล้วอยู่บน distribution ของ SheetJS เอง → `package.json` จึงชี้ไปที่
+  `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` **ข้อแลกเปลี่ยน:** ถ้า CDN ล่ม build จะพัง
+  (แก้ได้ด้วยการ vendor ไฟล์ .tgz เข้า repo ถ้าอยากตัดความเสี่ยงนี้) · ช่องโหว่ 2 ตัวนี้เข้าถึงได้จริง
+  เพราะเรา `XLSX.read` ไฟล์ที่ผู้ใช้อัปโหลดโดยตรง
+- **`overrides` ใน package.json จำเป็น** — Next มี postcss กับ sharp เป็น nested dep ที่ยังมีช่องโหว่
+  การ bump ตัวบนสุดไม่ถึง ต้อง override (npm ปฏิเสธ override ที่ค่าไม่ตรงกับ direct dependency)
 - **Vercel middleware ห้าม import `node:crypto`** — แม้อยู่ใน branch ที่ไม่ทำงาน ก็ทำให้ build พัง
   จึงมี `session-edge.ts` แยกไว้ (มีเทสเทียบกับฝั่ง node ว่าตัดสินเหมือนกัน)
 
