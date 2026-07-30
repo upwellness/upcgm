@@ -8,6 +8,12 @@ import { fromFile, newId, toFile } from '@/lib/markers-store';
 import type { MealMarker, Reading } from '@/lib/types';
 import { IconDownload, IconPlus, IconTrash, IconUpload } from './Icons';
 
+/** Same house cutoff used for the headline delta — kept in one place so the
+ * per-checkpoint colors below always agree with it. */
+const deltaColor = (d: number) => (d > 60 ? '#946516' : '#367C4F');
+
+const CHECKPOINT_LABEL: Record<number, string> = { 60: '1 ชม.', 120: '2 ชม.', 180: '3 ชม.' };
+
 interface Props {
   datasetId: string;
   sourceName: string;
@@ -53,7 +59,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
       .sort((a, b) => a.t - b.t);
     onChange(next);
     setDraft(null);
-    setNotice(null);
+    setNotice({ tone: 'ok', text: `บันทึก “${label}” แล้ว — จดจำอัตโนมัติในเครื่องนี้ ไม่ต้องกดซ้ำ` });
   }
 
   function remove(id: string) {
@@ -214,7 +220,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                 <div className="num mt-1 text-[0.82rem] sm:text-[0.85rem]">
                   {r?.delta != null ? (
                     <>
-                      <span className="font-semibold" style={{ color: r.delta > 60 ? '#946516' : '#367C4F' }}>
+                      <span className="font-semibold" style={{ color: deltaColor(r.delta) }}>
                         +{Math.round(r.delta)}
                       </span>
                       <span className="text-ink-40">
@@ -226,6 +232,30 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                     <span className="text-ink-40">ไม่มีข้อมูลน้ำตาลพอในช่วง 3 ชั่วโมงหลังมื้อนี้</span>
                   )}
                 </div>
+                {r && r.checkpoints.some((c) => c.value != null) && (
+                  <details className="mt-2 rounded-sm border border-line-soft bg-white/50">
+                    <summary className="cursor-pointer select-none px-3 py-2 text-[0.78rem] font-medium text-ink-70">
+                      ดูค่าที่ 1 / 2 / 3 ชั่วโมงหลังมื้อ
+                    </summary>
+                    <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-1">
+                      {r.checkpoints.map((c) => (
+                        <div key={c.minutes} className="num rounded-sm bg-surface-sunken px-2 py-1.5 text-center">
+                          <div className="text-[0.72rem] text-ink-40">{CHECKPOINT_LABEL[c.minutes]}</div>
+                          {c.value != null ? (
+                            <>
+                              <div className="text-[0.95rem] font-semibold">{c.value}</div>
+                              <div className="text-[0.72rem]" style={{ color: deltaColor(c.delta ?? 0) }}>
+                                {(c.delta ?? 0) > 0 ? '+' : ''}{c.delta}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="mt-1 text-[0.72rem] text-ink-40">ไม่มีข้อมูล</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </li>
             );
           })}

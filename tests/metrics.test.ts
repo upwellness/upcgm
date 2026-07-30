@@ -201,6 +201,59 @@ describe('meal response', () => {
     expect(r.peak).toBeNull();
     expect(r.minutesToBaseline).toBeNull();
   });
+
+  it('reports the 1 / 2 / 3-hour checkpoints against baseline', () => {
+    const markerT = at(0, 12, 0);
+    const rs: Reading[] = [
+      { t: markerT - 10, v: 100, flag: 'ok' },
+      { t: markerT, v: 100, flag: 'ok' },
+      { t: markerT + 30, v: 170, flag: 'ok' },
+      { t: markerT + 60, v: 150, flag: 'ok' },
+      { t: markerT + 120, v: 120, flag: 'ok' },
+      { t: markerT + 180, v: 104, flag: 'ok' },
+    ];
+    const r = computeMealResponse(markerT, rs);
+    expect(r.checkpoints.map((c) => c.minutes)).toEqual([60, 120, 180]);
+    expect(r.checkpoints.map((c) => c.value)).toEqual([150, 120, 104]);
+    expect(r.checkpoints.map((c) => c.delta)).toEqual([50, 20, 4]);
+  });
+
+  it('matches a checkpoint to a reading a few minutes off, but not a distant one', () => {
+    const markerT = at(0, 12, 0);
+    const rs: Reading[] = [
+      { t: markerT, v: 100, flag: 'ok' },
+      { t: markerT + 15, v: 140, flag: 'ok' },
+      // 6 minutes before the 1h mark — inside the tolerance
+      { t: markerT + 54, v: 130, flag: 'ok' },
+      // 20 minutes past the 2h mark — outside it, so 2h has no reading
+      { t: markerT + 140, v: 118, flag: 'ok' },
+      { t: markerT + 180, v: 102, flag: 'ok' },
+    ];
+    const [h1, h2, h3] = computeMealResponse(markerT, rs).checkpoints;
+    expect(h1.value).toBe(130);
+    expect(h2.value).toBeNull();
+    expect(h2.delta).toBeNull();
+    expect(h3.value).toBe(102);
+  });
+
+  it('leaves checkpoints empty when there is too little data for a baseline', () => {
+    const markerT = at(0, 12, 0);
+    const r = computeMealResponse(markerT, [{ t: markerT + 60, v: 150, flag: 'ok' }]);
+    expect(r.checkpoints.every((c) => c.value === null)).toBe(true);
+  });
+
+  it('ignores sensor artifacts when averaging a checkpoint', () => {
+    const markerT = at(0, 12, 0);
+    const rs: Reading[] = [
+      { t: markerT, v: 100, flag: 'ok' },
+      { t: markerT + 30, v: 160, flag: 'ok' },
+      { t: markerT + 58, v: 36, flag: 'artifact' },
+      { t: markerT + 60, v: 140, flag: 'ok' },
+      { t: markerT + 180, v: 100, flag: 'ok' },
+    ];
+    const [h1] = computeMealResponse(markerT, rs).checkpoints;
+    expect(h1.value).toBe(140);
+  });
 });
 
 describe('excluded readings', () => {

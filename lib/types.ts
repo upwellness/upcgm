@@ -192,6 +192,16 @@ export interface MealMarker {
   updatedAt: number;
 }
 
+/** Glucose at a fixed offset after a meal — the checkpoints a coach is asked about. */
+export interface MealCheckpoint {
+  /** minutes after the meal marker: 60, 120, or 180 */
+  minutes: number;
+  value: number | null;
+  /** value − baseline; null together with value when no reading falls near this offset */
+  delta: number | null;
+  readingsUsed: number;
+}
+
 export interface MealResponse {
   markerId: string;
   baseline: number | null;
@@ -202,4 +212,5 @@ export interface MealResponse {
   /** the number a coach can move even when weight will not budge */
   minutesToBaseline: number | null;
   readingsUsed: number;
+  checkpoints: MealCheckpoint[];
 }

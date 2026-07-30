@@ -15,6 +15,7 @@
 3. ตอบคำถามข้อเดียว: เคสใช้ยาลดน้ำตาลอยู่ไหม (เปลี่ยนวิธีอ่านช่วงน้ำตาลต่ำ)
 4. เลือกช่วงเวลา: 30/14/7/3 วัน · 24/12/6/3 ชั่วโมง · หรือกำหนดเอง
 5. บันทึกมื้ออาหารเป็น marker → เห็นการตอบสนองหลังมื้อ (ขึ้นเท่าไร กี่นาทีถึงสูงสุด กี่นาทีกลับที่เดิม)
+   · กดดูค่าที่ **1 / 2 / 3 ชั่วโมง** หลังมื้อได้ · บันทึกแล้วจดจำอัตโนมัติ ไม่ต้องกดเซฟ
 6. กด **สร้างใบสรุปให้เคส** → ได้ PNG ขนาด A4 (1588 × 2246 px) หรือสั่งพิมพ์เป็น PDF
 
 ---
@@ -69,7 +70,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```bash
 npm run dev        # localhost:4321
-npm test           # 101 tests
+npm test           # 105 tests
 npm run test:tz    # รันซ้ำใน UTC + Asia/Bangkok — เวลาเป็นจุดที่พลาดง่ายที่สุด
 npm run typecheck
 npm run build
@@ -90,7 +91,7 @@ npm run build
 lib/                 ใช้ได้ทั้งสองฝั่ง
   time.ts            wall-clock minutes — ห้ามใช้ new Date("...") กับ timestamp จากไฟล์
   bands.ts           ขอบเขตช่วง + สี (ไว้วาดกราฟ) + fmtPct
-  meal-response.ts   คำนวณการตอบสนองหลังมื้อ (ฝั่งเดียวกันทั้ง server และ client)
+  meal-response.ts   คำนวณการตอบสนองหลังมื้อ + ค่าที่ 1/2/3 ชม. (ใช้ร่วมกันทั้ง server และ client)
   markers-store.ts   localStorage + export/import + ผูกกับ datasetId
 server/              ไม่เคยส่งไป client
   auth/              scrypt passcode + HMAC session (node + edge)

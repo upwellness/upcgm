@@ -1,4 +1,4 @@
-import type { MealResponse, Reading } from './types';
+import type { MealCheckpoint, MealResponse, Reading } from './types';
 
 /**
  * Lives in lib/ rather than server/ because both sides need it: the screen shows
@@ -19,13 +19,35 @@ export const POST_MEAL_MINUTES = 180;
 /** Within 10 mg/dL of baseline counts as "back down" — sensor noise is ±10-ish. */
 export const BASELINE_TOLERANCE = 10;
 
+/** The offsets a coach is asked about, regardless of device sampling rate. */
+export const CHECKPOINT_MINUTES = [60, 120, 180] as const;
+/** Readings within this many minutes of a checkpoint are averaged into it — wide
+ * enough to catch a 15-minute-interval device, tight enough to still mean "around
+ * the 1/2/3-hour mark" rather than smearing into the next checkpoint. */
+const CHECKPOINT_TOLERANCE = 7;
+
+function computeCheckpoints(rs: Reading[], markerT: number, baseline: number | null): MealCheckpoint[] {
+  return CHECKPOINT_MINUTES.map((minutes) => {
+    const at = markerT + minutes;
+    const near = rs.filter((r) => Math.abs(r.t - at) <= CHECKPOINT_TOLERANCE);
+    if (near.length === 0 || baseline == null) {
+      return { minutes, value: null, delta: null, readingsUsed: 0 };
+    }
+    const value = near.reduce((a, r) => a + r.v, 0) / near.length;
+    return { minutes, value: Math.round(value), delta: Math.round(value - baseline), readingsUsed: near.length };
+  });
+}
+
 export function mealResponse(markerId: string, markerT: number, all: Reading[]): MealResponse {
   const rs = all.filter(usable);
   const pre = rs.filter((r) => r.t >= markerT - PRE_MEAL_MINUTES && r.t <= markerT);
   const win = rs.filter((r) => r.t >= markerT && r.t <= markerT + POST_MEAL_MINUTES);
 
   if (win.length < 3) {
-    return { markerId, baseline: null, peak: null, peakAt: null, delta: null, minutesToPeak: null, minutesToBaseline: null, readingsUsed: win.length };
+    // Same gate as everywhere else in this app: too little data for the headline
+    // numbers means too little data for the per-hour ones too, so both go null
+    // together rather than showing a checkpoint next to "not enough data".
+    return { markerId, baseline: null, peak: null, peakAt: null, delta: null, minutesToPeak: null, minutesToBaseline: null, readingsUsed: win.length, checkpoints: computeCheckpoints(rs, markerT, null) };
   }
 
   const baseline = pre.length ? pre.reduce((a, r) => a + r.v, 0) / pre.length : win[0].v;
@@ -44,6 +66,7 @@ export function mealResponse(markerId: string, markerT: number, all: Reading[]):
     minutesToPeak: peakAt - markerT,
     minutesToBaseline: backAt ? backAt.t - markerT : null,
     readingsUsed: win.length,
+    checkpoints: computeCheckpoints(rs, markerT, baseline),
   };
 }
 
