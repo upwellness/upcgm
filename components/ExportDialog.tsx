@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import A4Sheet from './A4Sheet';
+import type { PatternSnapshotView } from './PatternPanel';
 import type { FindingView } from './Findings';
 import { IconImage } from './Icons';
 
@@ -20,6 +21,7 @@ interface Props {
   headlineTh: string;
   limitationsTh: string[];
   narrative: string | null;
+  patterns: PatternSnapshotView | null;
 }
 
 export default function ExportDialog(props: Props) {
@@ -151,6 +153,7 @@ export default function ExportDialog(props: Props) {
                   headlineTh={props.headlineTh}
                   limitationsTh={props.limitationsTh}
                   narrative={props.narrative}
+                  patterns={props.patterns}
                   generatedAtLabel={new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
                 />
               </div>

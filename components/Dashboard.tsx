@@ -10,8 +10,9 @@ import ExportDialog from './ExportDialog';
 import Findings, { type FindingView } from './Findings';
 import GlucoseChart from './GlucoseChart';
 import { IconAlert, IconCalendar, IconImage, IconInfo, IconSparkle, IconUpload } from './Icons';
-import MealPanel from './MealPanel';
+import MealPanel, { type MealPatternView } from './MealPanel';
 import { MetricGrid, RangeBar, SpanStrip } from './Metrics';
+import PatternPanel, { type PatternSnapshotView } from './PatternPanel';
 import Uploader from './Uploader';
 
 interface AiResponse {
@@ -20,6 +21,8 @@ interface AiResponse {
     findings: FindingView[];
     limitationsTh: string[];
     escalate: boolean;
+    patterns: PatternSnapshotView | null;
+    perMeal: MealPatternView[];
   };
   narrative?: string | null;
   reasonTh?: string | null;
@@ -248,6 +251,12 @@ export default function Dashboard() {
                 )}
               </section>
 
+              {interp?.patterns && interp.patterns.judged + interp.patterns.thinData + interp.patterns.betweenShapes > 0 && (
+                <section className="mt-5">
+                  <PatternPanel snap={interp.patterns} />
+                </section>
+              )}
+
               <section className="mt-5">
                 <MealPanel
                   datasetId={result.datasetId}
@@ -257,6 +266,7 @@ export default function Dashboard() {
                   onChange={persist}
                   defaultT={Math.round((w.from + w.to) / 2)}
                   storageWorks={storageWorks}
+                  perMeal={interp?.perMeal ?? []}
                 />
               </section>
 
@@ -287,6 +297,7 @@ export default function Dashboard() {
                 headlineTh={interp?.headlineTh ?? ''}
                 limitationsTh={interp?.limitationsTh ?? []}
                 narrative={ai?.narrative ?? null}
+                patterns={interp?.patterns ?? null}
               />
             </>
           )}

@@ -1,0 +1,349 @@
+import type { MealMarker, MealResponse, Reading } from '@/lib/types';
+import { fmtThaiDate, fmtTime, fmtDuration } from '@/lib/time';
+import { POST_MEAL_MINUTES, PRE_MEAL_MINUTES } from '@/lib/meal-response';
+import { SOURCE_HOUSE } from './thresholds';
+
+/**
+ * The four shapes a post-meal curve can take, in the words the coaching deck
+ * teaches: พุ่ง / กว้าง / ค้าง / ตก.
+ *
+ * These four words are OURS. They are a teaching device, not medical
+ * terminology, and no published consensus classifies post-meal CGM curves this
+ * way — so every threshold in this file is `house` and the UI has to say so.
+ * The rule the deck sets and this file must honour: a real curve is usually a
+ * mix, so we name the one that matters most and list the rest as secondary,
+ * rather than pretending each meal is exactly one shape.
+ *
+ * Lives under server/ with the rest of the interpretation. The thresholds are
+ * the part worth protecting; the client only ever receives the verdict.
+ */
+
+export type PatternKey = 'spike' | 'wide' | 'stuck' | 'crash' | 'flat';
+
+export interface PatternDef {
+  key: PatternKey;
+  labelTh: string;
+  en: string;
+  /** one line a coach can say out loud */
+  meaningTh: string;
+  /** the first thing to try — behaviour only, never a dose */
+  firstMoveTh: string;
+}
+
+export const PATTERNS: Record<PatternKey, PatternDef> = {
+  spike: {
+    key: 'spike', labelTh: 'พุ่ง', en: 'Spike',
+    meaningTh: 'ขึ้นเร็ว ขึ้นสูง ยอดแหลม แล้วลงเร็ว',
+    firstMoveTh: 'สลับลำดับ — กินผัก/โปรตีนก่อนคาร์บ แล้วเว้นสักครู่ก่อนแตะคาร์บ',
+  },
+  wide: {
+    key: 'wide', labelTh: 'กว้าง', en: 'Wide',
+    meaningTh: 'ยอดไม่สูงเท่าพุ่ง แต่ลากอยู่หลายชั่วโมง',
+    firstMoveTh: 'ลดปริมาณรวมของมื้อนั้น และจบมื้อให้เป็นเวลา ไม่กินยาว',
+  },
+  stuck: {
+    key: 'stuck', labelTh: 'ค้าง', en: 'Stuck',
+    meaningTh: 'ลงมาได้บ้าง แต่ค้างสูงกว่าก่อนกิน ไม่ถึงเส้นเดิม',
+    firstMoveTh: 'ขยับหลังมื้อ และเว้นระยะให้กราฟลงจริงก่อนมื้อถัดไป',
+  },
+  crash: {
+    key: 'crash', labelTh: 'ตก', en: 'Crash',
+    meaningTh: 'พุ่งแล้วดิ่งลงต่ำกว่าระดับก่อนกิน',
+    firstMoveTh: 'แก้ที่ยอดก่อน — ยอดเตี้ยลง หลุมมักตื้นลงตาม',
+  },
+  flat: {
+    key: 'flat', labelTh: 'เรียบ', en: 'Flat',
+    meaningTh: 'ขึ้นไม่มาก และกลับลงมาที่เดิมได้เอง',
+    firstMoveTh: 'มื้อแบบนี้คือมื้อที่ควรทำซ้ำ — จดไว้ว่ากินอะไร',
+  },
+};
+
+/**
+ * All house numbers, in one block so they can be read and argued with.
+ * Chosen to match the shapes the deck draws, then sanity-checked against the
+ * real files on hand; none of them come from a published target.
+ */
+export const PATTERN_RULES = {
+  /** a rise this big is the one worth naming at all */
+  spikeDelta: 60,
+  /** ...and "พุ่ง" means it got there fast */
+  spikeMinutesToPeak: 60,
+  /** "กว้าง" is defined by time spent up, not by height */
+  wideAboveBaseline: 30,
+  wideMinutes: 150,
+  /** still this far above the starting line at the 3-hour mark = ค้าง */
+  stuckAt180Above: 25,
+  /** dipping this far under the pre-meal line after the peak = ตก */
+  crashBelowBaseline: 15,
+  /** below this rise we call it เรียบ and stop talking */
+  flatDelta: 30,
+  /** fewer usable readings than this in the 3h window and we refuse to classify */
+  minReadings: 12,
+  sourceTh: SOURCE_HOUSE,
+} as const;
+
+export interface PatternHit {
+  key: PatternKey;
+  /** the number that fired the rule, for the UI to print next to the name */
+  evidenceTh: string;
+}
+
+/**
+ * Two very different reasons a meal gets no shape, and they must never be shown
+ * as the same thing: 'thin-data' means we could not see, 'between-shapes' means
+ * we saw clearly and it genuinely is not one of the four.
+ */
+export type NoShapeReason = 'thin-data' | 'between-shapes';
+
+export interface MealPattern {
+  markerId: string;
+  /** null when the window is too thin to judge — never guess a shape */
+  primary: PatternKey | null;
+  /** other shapes the same curve also matches, strongest first */
+  also: PatternKey[];
+  hits: PatternHit[];
+  /** set together with skippedReasonTh whenever primary is null */
+  noShape: NoShapeReason | null;
+  /** why we refused, when primary is null */
+  skippedReasonTh: string | null;
+  metrics: {
+    delta: number | null;
+    minutesToPeak: number | null;
+    minutesAboveBaseline: number | null;
+    at180Delta: number | null;
+    nadirAfterPeakDelta: number | null;
+  };
+}
+
+const usable = (r: Reading) => r.flag === 'ok' || r.flag === 'censored';
+
+/**
+ * Classify one meal. Order of the checks is the priority order the deck sets:
+ * ตก first because it is the one with a safety consequence, then ค้าง because
+ * it is a whole-week problem rather than a this-meal problem, then พุ่ง, then
+ * กว้าง. Everything that matched is still reported in `also`.
+ */
+export function classifyMeal(markerT: number, response: MealResponse, all: Reading[]): MealPattern {
+  const rs = all.filter(usable);
+  const win = rs.filter((r) => r.t >= markerT && r.t <= markerT + POST_MEAL_MINUTES);
+  const base = response.baseline;
+
+  const empty: MealPattern['metrics'] = {
+    delta: null, minutesToPeak: null, minutesAboveBaseline: null,
+    at180Delta: null, nadirAfterPeakDelta: null,
+  };
+
+  if (base == null || response.delta == null || win.length < PATTERN_RULES.minReadings) {
+    return {
+      markerId: response.markerId, primary: null, also: [], hits: [],
+      noShape: 'thin-data',
+      skippedReasonTh: `ข้อมูลในช่วง 3 ชั่วโมงหลังมื้อนี้มีเพียง ${win.length} ค่า (ต้องมีอย่างน้อย ${PATTERN_RULES.minReadings}) — ยังไม่พอบอกรูปร่าง`,
+      metrics: empty,
+    };
+  }
+
+  // Minutes spent meaningfully above the pre-meal line. Counted as the gap
+  // between consecutive readings rather than "readings x interval" so a gap in
+  // the middle of the window cannot inflate it.
+  let minutesAbove = 0;
+  for (let i = 1; i < win.length; i++) {
+    const dt = win[i].t - win[i - 1].t;
+    if (dt <= 0 || dt > 30) continue; // a gap that long is not time we can claim
+    const mid = (win[i].v + win[i - 1].v) / 2;
+    if (mid >= base + PATTERN_RULES.wideAboveBaseline) minutesAbove += dt;
+  }
+
+  // Where it sat at the 3-hour mark, and how deep it went after the peak.
+  const tail = win.filter((r) => r.t >= markerT + POST_MEAL_MINUTES - 20);
+  const at180 = tail.length ? tail.reduce((a, r) => a + r.v, 0) / tail.length : null;
+  const afterPeak = response.peakAt != null ? win.filter((r) => r.t > response.peakAt!) : [];
+  const nadir = afterPeak.length ? Math.min(...afterPeak.map((r) => r.v)) : null;
+
+  const metrics: MealPattern['metrics'] = {
+    delta: response.delta,
+    minutesToPeak: response.minutesToPeak,
+    minutesAboveBaseline: Math.round(minutesAbove),
+    at180Delta: at180 == null ? null : Math.round(at180 - base),
+    nadirAfterPeakDelta: nadir == null ? null : Math.round(nadir - base),
+  };
+
+  const hits: PatternHit[] = [];
+
+  if (metrics.nadirAfterPeakDelta != null && metrics.nadirAfterPeakDelta <= -PATTERN_RULES.crashBelowBaseline) {
+    hits.push({
+      key: 'crash',
+      evidenceTh: `หลังยอดแล้วลงไปต่ำกว่าระดับก่อนกิน ${Math.abs(metrics.nadirAfterPeakDelta)} มก./ดล.`,
+    });
+  }
+  if (metrics.at180Delta != null && metrics.at180Delta >= PATTERN_RULES.stuckAt180Above) {
+    hits.push({
+      key: 'stuck',
+      evidenceTh: `ครบ 3 ชั่วโมงแล้วยังสูงกว่าก่อนกิน ${metrics.at180Delta} มก./ดล.`,
+    });
+  }
+  if (response.delta >= PATTERN_RULES.spikeDelta &&
+      response.minutesToPeak != null && response.minutesToPeak <= PATTERN_RULES.spikeMinutesToPeak) {
+    hits.push({
+      key: 'spike',
+      evidenceTh: `ขึ้น +${Math.round(response.delta)} มก./ดล. ภายใน ${response.minutesToPeak} นาที`,
+    });
+  }
+  if (minutesAbove >= PATTERN_RULES.wideMinutes) {
+    hits.push({
+      key: 'wide',
+      evidenceTh: `อยู่สูงกว่าระดับก่อนกินเกิน ${PATTERN_RULES.wideAboveBaseline} มก./ดล. นาน ${fmtDuration(minutesAbove)}`,
+    });
+  }
+
+  if (hits.length === 0) {
+    const flat = response.delta < PATTERN_RULES.flatDelta;
+    return {
+      markerId: response.markerId,
+      primary: flat ? 'flat' : null,
+      also: [],
+      hits: flat
+        ? [{ key: 'flat', evidenceTh: `ขึ้นเพียง +${Math.round(response.delta)} มก./ดล. และกลับลงมาที่เดิม` }]
+        : [],
+      noShape: flat ? null : 'between-shapes',
+      skippedReasonTh: flat
+        ? null
+        : `ขึ้น +${Math.round(response.delta)} มก./ดล. แต่ไม่เข้าเกณฑ์รูปร่างใดชัดเจน — อยู่กลาง ๆ ระหว่างแบบ`,
+      metrics,
+    };
+  }
+
+  // hits are already pushed in priority order
+  return {
+    markerId: response.markerId,
+    primary: hits[0].key,
+    also: hits.slice(1).map((h) => h.key),
+    hits,
+    noShape: null,
+    skippedReasonTh: null,
+    metrics,
+  };
+}
+
+export interface PatternSnapshot {
+  /** meals we could actually judge */
+  judged: number;
+  /** meals we could not see well enough to judge */
+  thinData: number;
+  /** meals seen clearly that are genuinely none of the four shapes */
+  betweenShapes: number;
+  counts: Record<PatternKey, number>;
+  /** the shape to work on first, or null when nothing stands out */
+  dominant: PatternKey | null;
+  /** short line naming the dominant shape and how often it showed up */
+  headlineTh: string;
+  /** ordered lines a coach reads out — one per shape that appeared */
+  linesTh: string[];
+  /** the single next experiment, tied to the dominant shape */
+  firstMoveTh: string | null;
+  /** meals worth pointing at on the chart, worst first */
+  examples: { markerId: string; labelTh: string; whenTh: string; patternTh: string; evidenceTh: string }[];
+  /** true when a low after a meal showed up and meds make it a doctor's call */
+  crashNeedsPrescriber: boolean;
+}
+
+/**
+ * Roll the per-meal verdicts into the one paragraph a coach opens the session
+ * with. Deliberately refuses to name a dominant shape off one or two meals: a
+ * single ข้าวมันไก่ is an anecdote, not a pattern.
+ */
+export const MIN_MEALS_FOR_DOMINANT = 3;
+
+export function summarisePatterns(
+  patterns: MealPattern[],
+  markers: MealMarker[],
+  opts: { medsLowering: boolean },
+): PatternSnapshot {
+  const counts: Record<PatternKey, number> = { spike: 0, wide: 0, stuck: 0, crash: 0, flat: 0 };
+  let judged = 0, thinData = 0, betweenShapes = 0;
+
+  for (const p of patterns) {
+    if (p.primary == null) {
+      if (p.noShape === 'thin-data') thinData++; else betweenShapes++;
+      continue;
+    }
+    judged++;
+    counts[p.primary]++;
+  }
+
+  // "Dominant" means the most common non-flat shape. A run of flat meals is a
+  // good result, not a problem to fix, so it never becomes the thing to work on.
+  const ranked = (['crash', 'stuck', 'spike', 'wide'] as PatternKey[])
+    .filter((k) => counts[k] > 0)
+    .sort((a, b) => counts[b] - counts[a]);
+  const dominant = judged >= MIN_MEALS_FOR_DOMINANT && ranked.length > 0 ? ranked[0] : null;
+
+  const byId = new Map(markers.map((m) => [m.id, m]));
+  const examples = patterns
+    .filter((p) => p.primary != null && p.primary !== 'flat')
+    .sort((a, b) => {
+      const rank = (k: PatternKey | null) => (['crash', 'stuck', 'spike', 'wide'] as PatternKey[]).indexOf(k as PatternKey);
+      const d = rank(a.primary) - rank(b.primary);
+      return d !== 0 ? d : (b.metrics.delta ?? 0) - (a.metrics.delta ?? 0);
+    })
+    .slice(0, 4)
+    .map((p) => {
+      const mk = byId.get(p.markerId);
+      return {
+        markerId: p.markerId,
+        labelTh: mk?.label ?? 'มื้อที่บันทึกไว้',
+        whenTh: mk ? `${fmtThaiDate(mk.t)} ${fmtTime(mk.t)}` : '',
+        patternTh: PATTERNS[p.primary!].labelTh,
+        evidenceTh: p.hits[0]?.evidenceTh ?? '',
+      };
+    });
+
+  const linesTh: string[] = [];
+  for (const k of ['crash', 'stuck', 'spike', 'wide', 'flat'] as PatternKey[]) {
+    if (counts[k] === 0) continue;
+    linesTh.push(`${PATTERNS[k].labelTh} ${counts[k]} มื้อ — ${PATTERNS[k].meaningTh}`);
+  }
+
+  let headlineTh: string;
+  if (judged === 0) {
+    headlineTh = 'ยังไม่มีมื้อที่ข้อมูลพอจะบอกรูปร่างได้ — บันทึกมื้ออาหารเพิ่มอีกสักสองสามมื้อ';
+  } else if (dominant == null) {
+    headlineTh = judged < MIN_MEALS_FOR_DOMINANT
+      ? `มี ${judged} มื้อที่อ่านรูปร่างได้ — ยังน้อยเกินกว่าจะบอกว่าเป็นแพตเทิร์นประจำ (ขออย่างน้อย ${MIN_MEALS_FOR_DOMINANT} มื้อ)`
+      : `${judged} มื้อที่อ่านได้ ส่วนใหญ่กลับลงมาที่เดิมได้เอง — ยังไม่มีรูปร่างไหนที่ต้องแก้เป็นพิเศษ`;
+  } else {
+    headlineTh = `รูปร่างที่เจอบ่อยที่สุดคือ “${PATTERNS[dominant].labelTh}” (${counts[dominant]} จาก ${judged} มื้อที่อ่านได้) — ${PATTERNS[dominant].meaningTh}`;
+  }
+
+  const crashNeedsPrescriber = counts.crash > 0 && opts.medsLowering;
+
+  return {
+    judged, thinData, betweenShapes, counts, dominant, headlineTh, linesTh,
+    firstMoveTh: dominant ? PATTERNS[dominant].firstMoveTh : null,
+    examples,
+    crashNeedsPrescriber,
+  };
+}
+
+/** Convenience for callers that hold markers + responses and want both steps. */
+export function analysePatterns(
+  markers: MealMarker[],
+  responses: MealResponse[],
+  readings: Reading[],
+  opts: { medsLowering: boolean },
+): { perMeal: MealPattern[]; snapshot: PatternSnapshot } {
+  const byId = new Map(markers.map((m) => [m.id, m]));
+  const perMeal = responses
+    .filter((r) => byId.has(r.markerId))
+    .map((r) => classifyMeal(byId.get(r.markerId)!.t, r, readings));
+  return { perMeal, snapshot: summarisePatterns(perMeal, markers, opts) };
+}
+
+/** Documented so the UI can print the rule next to the verdict. */
+export const PATTERN_RULE_NOTE_TH =
+  `คำว่า พุ่ง · กว้าง · ค้าง · ตก เป็นคำที่ทีม UP Wellness ตั้งขึ้นเองเพื่อสอนให้จำง่าย ไม่ใช่ศัพท์ทางการแพทย์ ` +
+  `และยังไม่มีมาตรฐานสากลที่จัดกลุ่มรูปกราฟหลังอาหารแบบนี้ · เกณฑ์ที่ใช้: ` +
+  `พุ่ง = ขึ้น ≥ ${PATTERN_RULES.spikeDelta} มก./ดล. ภายใน ${PATTERN_RULES.spikeMinutesToPeak} นาที · ` +
+  `กว้าง = อยู่สูงกว่าก่อนกินเกิน ${PATTERN_RULES.wideAboveBaseline} มก./ดล. นานกว่า ${PATTERN_RULES.wideMinutes} นาที · ` +
+  `ค้าง = ครบ 3 ชม. ยังสูงกว่าก่อนกิน ≥ ${PATTERN_RULES.stuckAt180Above} มก./ดล. · ` +
+  `ตก = หลังยอดลงต่ำกว่าก่อนกิน ≥ ${PATTERN_RULES.crashBelowBaseline} มก./ดล. · ` +
+  `ระดับก่อนกินคิดจากค่าเฉลี่ย ${PRE_MEAL_MINUTES} นาทีก่อนมื้อ`;

@@ -1,12 +1,13 @@
 'use client';
 
 import { forwardRef } from 'react';
-import { BANDS, fmtPct } from '@/lib/bands';
+import { BANDS, PATTERN_STYLE, fmtPct, type PatternKey } from '@/lib/bands';
 import { fmtDuration, fmtThaiDate, pctToMinutesPerDay } from '@/lib/time';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import GlucoseChart from './GlucoseChart';
 import AgpChart from './AgpChart';
 import type { FindingView } from './Findings';
+import type { PatternSnapshotView } from './PatternPanel';
 
 /**
  * One page the case takes home. It is a different document from the screen, not
@@ -34,6 +35,8 @@ export interface A4Props {
   headlineTh: string;
   limitationsTh: string[];
   narrative: string | null;
+  /** the พุ่ง/กว้าง/ค้าง/ตก rollup — omitted when no meals were marked */
+  patterns: PatternSnapshotView | null;
   generatedAtLabel: string;
 }
 
@@ -41,11 +44,19 @@ const pc = (n: number) => fmtPct(n, 1);
 const barLabel = (p: number) => fmtPct(p, 0);
 
 const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
-  { clientName, coachNote, w, readings, markers, findings, headlineTh, limitationsTh, narrative, generatedAtLabel },
+  { clientName, coachNote, w, readings, markers, findings, headlineTh, limitationsTh, narrative, patterns, generatedAtLabel },
   ref,
 ) {
   const m = w.metrics;
-  const top = findings.filter((f) => f.severity !== 'good').slice(0, 3);
+  // The dominant-shape finding is dropped from this list because the shape
+  // section below says the same thing better, with the curve drawn. Printing
+  // both costs a third of a page and buys nothing. The one exception is the
+  // crash-on-medication finding: that is a safety line, and it belongs at the
+  // top of the page where a doctor will see it, not in a chart legend.
+  const top = findings
+    .filter((f) => f.severity !== 'good')
+    .filter((f) => !f.id.startsWith('pattern-') || f.id === 'pattern-crash-meds')
+    .slice(0, 3);
   const good = findings.filter((f) => f.severity === 'good').slice(0, 2);
   const showAgp = w.gate.showAgp && w.agp.length > 0;
 
@@ -160,6 +171,36 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
               </li>
             ))}
           </ol>
+        </div>
+      )}
+
+      {patterns && patterns.judged > 0 && (
+        <div className="mt-3.5">
+          <SectionTitle>รูปร่างกราฟหลังมื้ออาหาร</SectionTitle>
+          <p className="mt-1 text-[0.82rem] leading-relaxed">{patterns.headlineTh}</p>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+            {(['crash', 'stuck', 'spike', 'wide', 'flat'] as PatternKey[])
+              .filter((k) => (patterns.counts[k] ?? 0) > 0)
+              .map((k) => (
+                <span key={k} className="flex items-center gap-1.5">
+                  <svg viewBox="0 0 60 28" width="46" height="21" aria-hidden="true">
+                    <path d={PATTERN_STYLE[k].path} fill="none" stroke={PATTERN_STYLE[k].ink}
+                      strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-[0.78rem] font-medium" style={{ color: PATTERN_STYLE[k].ink }}>
+                    {PATTERN_STYLE[k].labelTh}
+                  </span>
+                  <span className="num text-[0.76rem] text-ink-70">{patterns.counts[k]} มื้อ</span>
+                </span>
+              ))}
+          </div>
+          {patterns.firstMoveTh && (
+            <p className="mt-1.5 rounded px-2.5 py-1.5 text-[0.8rem] leading-relaxed"
+              style={{ background: 'rgba(93,110,72,.10)' }}>
+              <span className="font-medium" style={{ color: '#5D6E48' }}>ลองแบบเดียวก่อน · </span>
+              {patterns.firstMoveTh}
+            </p>
+          )}
         </div>
       )}
 

@@ -1,6 +1,8 @@
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, MealResponse } from '@/lib/types';
 import { fmtDuration, fmtThaiDate, fmtTime, pctToMinutesPerDay } from '@/lib/time';
+import { readingsFromWire } from '@/lib/meal-response';
 import { DEVICE_FLOOR, TARGETS_ADULT_DIABETES, gateForWindow } from './thresholds';
+import { PATTERNS, analysePatterns, type MealPattern, type PatternSnapshot } from './patterns';
 
 /**
  * Turning numbers into sentences is where a tool like this either earns trust or
@@ -36,6 +38,10 @@ export interface Interpretation {
   limitationsTh: string[];
   /** true when the session must lead with "see the prescriber", not with advice */
   escalate: boolean;
+  /** พุ่ง/กว้าง/ค้าง/ตก rollup — null when no meals were marked at all */
+  patterns: PatternSnapshot | null;
+  /** per-meal verdicts, so the meal list can show a badge next to each row */
+  perMeal: MealPattern[];
 }
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -177,6 +183,49 @@ export function interpret(
     .map((r) => ({ r, marker: (opts.markers ?? []).find((mk) => mk.id === r.markerId) }))
     .filter((p): p is { r: MealResponse; marker: MealMarker } => !!p.marker && p.r.delta != null);
 
+  // ---- shape of each meal: พุ่ง / กว้าง / ค้าง / ตก ----
+  // Runs off the full series, not the paired subset, because a marker with too
+  // little data around it still deserves an honest "cannot tell" rather than
+  // being silently dropped.
+  const readings = readingsFromWire(result.series);
+  const { perMeal, snapshot } = analysePatterns(
+    opts.markers ?? [],
+    opts.responses ?? [],
+    readings,
+    { medsLowering: opts.meds === 'yes' },
+  );
+  const patterns = (opts.markers ?? []).length > 0 ? snapshot : null;
+
+  if (patterns && patterns.crashNeedsPrescriber) {
+    // A post-meal low in someone on a glucose-lowering medicine is not a meal
+    // to coach around. It goes back to whoever wrote the prescription.
+    escalate = true;
+    findings.push({
+      id: 'pattern-crash-meds',
+      severity: 'urgent',
+      titleTh: 'เจอรูปแบบ “ตก” หลังมื้ออาหาร ในเคสที่ใช้ยาลดน้ำตาลอยู่',
+      evidenceTh: `${patterns.counts.crash} มื้อที่หลังยอดแล้วลงต่ำกว่าระดับก่อนกินเกิน ${'15'} มก./ดล.`,
+      actionTh: 'หยุดปรับอาหารเองก่อน แล้วส่งกราฟให้แพทย์ผู้สั่งยาดู — ช่วงต่ำในคนที่ใช้ยาอยู่เป็นเรื่องของขนาดยา ไม่ใช่เรื่องที่โค้ชแก้ด้วยเมนู',
+      basis: 'house',
+    });
+  }
+
+  if (patterns?.dominant) {
+    const d = PATTERNS[patterns.dominant];
+    findings.push({
+      id: `pattern-${patterns.dominant}`,
+      severity: patterns.dominant === 'crash' ? 'attention' : 'watch',
+      titleTh: `รูปร่างกราฟที่เจอบ่อยที่สุดคือ “${d.labelTh}” — ${d.meaningTh}`,
+      evidenceTh:
+        `${patterns.counts[patterns.dominant]} จาก ${patterns.judged} มื้อที่ข้อมูลพอจะอ่านรูปร่างได้` +
+        (patterns.thinData > 0 ? ` (อีก ${patterns.thinData} มื้อข้อมูลไม่พอ)` : '') +
+        (patterns.betweenShapes > 0 ? ` (อีก ${patterns.betweenShapes} มื้ออยู่กลาง ๆ ระหว่างแบบ)` : '') +
+        ` · ${patterns.examples[0] ? `เช่น “${patterns.examples[0].labelTh}” ${patterns.examples[0].whenTh} — ${patterns.examples[0].evidenceTh}` : ''}`,
+      actionTh: `${d.firstMoveTh} — แก้ทีละแบบ แบบที่เด่นที่สุดก่อน แล้วอีก 2–3 วันมาเทียบกราฟกัน`,
+      basis: 'house',
+    });
+  }
+
   if (paired.length > 0) {
     const worst = paired.reduce((a, b) => ((a.r.delta ?? 0) >= (b.r.delta ?? 0) ? a : b));
     findings.push({
@@ -241,8 +290,14 @@ export function interpret(
     limitationsTh.push('ยังไม่ได้ระบุว่าเคสใช้ยาลดน้ำตาลอยู่หรือไม่ — ข้อสรุปเรื่องช่วงน้ำตาลต่ำจึงตีความได้จำกัด');
   }
 
+  if (patterns && patterns.judged > 0) {
+    limitationsTh.push(
+      'ชื่อรูปร่างกราฟ (พุ่ง · กว้าง · ค้าง · ตก) เป็นคำที่ทีมตั้งขึ้นเองเพื่อสอนให้จำง่าย ไม่ใช่ศัพท์ทางการแพทย์ และเกณฑ์ที่ใช้แบ่งก็เป็นเกณฑ์ของทีมเอง',
+    );
+  }
+
   const headlineTh = buildHeadline(m, gate.showRangePercents, escalate);
-  return { headlineTh, findings, limitationsTh, escalate };
+  return { headlineTh, findings, limitationsTh, escalate, patterns, perMeal };
 }
 
 function buildHeadline(

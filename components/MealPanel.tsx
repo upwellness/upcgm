@@ -1,16 +1,31 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { MEAL_KINDS } from '@/lib/bands';
+import { MEAL_KINDS, type PatternKey } from '@/lib/bands';
 import { mealResponse } from '@/lib/meal-response';
 import { fmtDateTime, fmtDuration, toLocalInputValue, fromLocalInputValue } from '@/lib/time';
 import { fromFile, newId, toFile } from '@/lib/markers-store';
 import type { MealMarker, Reading } from '@/lib/types';
 import { IconDownload, IconPlus, IconTrash, IconUpload } from './Icons';
+import { PatternChip } from './PatternPanel';
+
+/** Wire shape of MealPattern from server/cgm/patterns.ts — verdict only. */
+export interface MealPatternView {
+  markerId: string;
+  primary: PatternKey | null;
+  also: PatternKey[];
+  hits: { key: PatternKey; evidenceTh: string }[];
+  noShape: 'thin-data' | 'between-shapes' | null;
+  skippedReasonTh: string | null;
+}
 
 /** Same house cutoff used for the headline delta — kept in one place so the
  * per-checkpoint colors below always agree with it. */
 const deltaColor = (d: number) => (d > 60 ? '#946516' : '#367C4F');
+
+const PATTERN_LABEL: Record<PatternKey, string> = {
+  spike: 'พุ่ง', wide: 'กว้าง', stuck: 'ค้าง', crash: 'ตก', flat: 'เรียบ',
+};
 
 const CHECKPOINT_LABEL: Record<number, string> = { 60: '1 ชม.', 120: '2 ชม.', 180: '3 ชม.' };
 
@@ -23,9 +38,11 @@ interface Props {
   /** default time for a new marker — the middle of the visible window */
   defaultT: number;
   storageWorks: boolean;
+  /** shape verdicts, computed on the server; empty until the first reply lands */
+  perMeal: MealPatternView[];
 }
 
-export default function MealPanel({ datasetId, sourceName, readings, markers, onChange, defaultT, storageWorks }: Props) {
+export default function MealPanel({ datasetId, sourceName, readings, markers, onChange, defaultT, storageWorks, perMeal }: Props) {
   const [draft, setDraft] = useState<MealMarker | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -34,6 +51,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
     () => new Map(markers.map((m) => [m.id, mealResponse(m.id, m.t, readings)])),
     [markers, readings],
   );
+  const shapes = useMemo(() => new Map(perMeal.map((p) => [p.markerId, p])), [perMeal]);
 
   function startNew() {
     setDraft({
@@ -199,6 +217,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
         <ul className="mt-4 divide-y divide-line-soft">
           {markers.map((m) => {
             const r = responses.get(m.id);
+            const shape = shapes.get(m.id);
             const kind = MEAL_KINDS.find((k) => k.key === m.kind);
             return (
               <li key={m.id} className="py-3">
@@ -206,6 +225,24 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                   <span aria-hidden="true">{kind?.glyph}</span>
                   <span className="font-medium">{m.label}</span>
                   <span className="num text-[0.8rem] text-ink-40">{fmtDateTime(m.t)}</span>
+                  {shape?.primary && <PatternChip k={shape.primary} size="sm" />}
+                  {!shape && (
+                    <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"
+                      title="มื้อนี้อยู่นอกช่วงเวลาที่เลือกอยู่ จึงไม่ถูกนำมาวิเคราะห์รูปร่าง">
+                      นอกช่วงที่เลือก
+                    </span>
+                  )}
+                  {shape && !shape.primary && (
+                    <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"
+                      title={shape.skippedReasonTh ?? ''}>
+                      {shape.noShape === 'thin-data' ? 'ข้อมูลไม่พอ' : 'อยู่กลาง ๆ ระหว่างแบบ'}
+                    </span>
+                  )}
+                  {shape?.also.map((k) => (
+                    <span key={k} className="rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40">
+                      + {PATTERN_LABEL[k]}
+                    </span>
+                  ))}
                   {m.eatingOrder === 'veg-first' && (
                     <span className="rounded-full bg-zone-in/12 px-2 py-0.5 text-[0.72rem] text-zone-in-ink">ผักก่อน</span>
                   )}
