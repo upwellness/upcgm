@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background:
+    radial-gradient(1100px 640px at 50% -10%, rgba(61,88,38,.09), transparent 60%),
+    linear-gradient(180deg, #FBF9F4, #F7F4EE);
+  min-height: 100dvh;
+  color: #2A2E22;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thai needs headroom: tone marks stack two levels above the base glyph and get
+   clipped below 1.6. */
+body, p, li, td, th { line-height: 1.75; }
+h1, h2, h3, h4 { line-height: 1.4; }
+
+/* Any digit that changes when the range changes must not shift the layout. */
+.num { font-variant-numeric: tabular-nums; }
+
+/* Glass on the shell only — never under a number. */
+.glass { background: rgba(255,255,255,.72); backdrop-filter: blur(10px) saturate(140%); border: 1px solid rgba(42,46,34,.07); }
+.glass-bar { background: rgba(255,255,255,.62); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(42,46,34,.07); }
+@supports not (backdrop-filter: blur(1px)) {
+  .glass, .glass-bar { background: rgba(255,255,255,.96); }
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgba(61,88,38,.45);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .page-a4 { width: 210mm; min-height: 297mm; box-shadow: none !important; margin: 0 !important; }
+  @page { size: A4 portrait; margin: 0; }
+}

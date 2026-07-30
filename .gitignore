@@ -1,0 +1,7 @@
+.next/
+node_modules/
+.env*.local
+tests/fixtures/*.xlsx
+*.log
+public/__dev/
+*.tsbuildinfo

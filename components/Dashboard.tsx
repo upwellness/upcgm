@@ -1,0 +1,479 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { mealResponse, readingsFromWire } from '@/lib/meal-response';
+import { loadMarkers, saveMarkers } from '@/lib/markers-store';
+import { fmtDateTime, fmtThaiDate, fromLocalInputValue, toLocalInputValue } from '@/lib/time';
+import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
+import AgpChart from './AgpChart';
+import ExportDialog from './ExportDialog';
+import Findings, { type FindingView } from './Findings';
+import GlucoseChart from './GlucoseChart';
+import { IconAlert, IconCalendar, IconImage, IconInfo, IconSparkle, IconUpload } from './Icons';
+import MealPanel from './MealPanel';
+import { MetricGrid, RangeBar, SpanStrip } from './Metrics';
+import Uploader from './Uploader';
+
+interface AiResponse {
+  interpretation?: {
+    headlineTh: string;
+    findings: FindingView[];
+    limitationsTh: string[];
+    escalate: boolean;
+  };
+  narrative?: string | null;
+  reasonTh?: string | null;
+}
+
+export default function Dashboard() {
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [meds, setMeds] = useState<GlucoseLoweringMeds | null>(null);
+  const [markers, setMarkers] = useState<MealMarker[]>([]);
+  const [storageWorks, setStorageWorks] = useState(true);
+  const [windowKey, setWindowKey] = useState<string>('');
+  const [custom, setCustom] = useState<{ from: number; to: number } | null>(null);
+  const [ai, setAi] = useState<AiResponse | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [markersRestored, setMarkersRestored] = useState(0);
+  const aiSeq = useRef(0);
+
+  const readings: Reading[] = useMemo(
+    () => (result ? readingsFromWire(result.series) : []),
+    [result],
+  );
+
+  const activeWindow: WindowSummaryWire | null = useMemo(() => {
+    if (!result) return null;
+    if (custom) return buildCustomWindow(result, custom.from, custom.to);
+    return result.windows.find((w) => w.key === windowKey) ?? result.windows[0] ?? null;
+  }, [result, windowKey, custom]);
+
+  const responses = useMemo(
+    () => markers.map((m) => mealResponse(m.id, m.t, readings)),
+    [markers, readings],
+  );
+
+  // Restore markers whenever a new dataset lands. A coach re-opening last week's
+  // file should find their meal notes already on the chart.
+  useEffect(() => {
+    if (!result) return;
+    const saved = loadMarkers(result.datasetId);
+    setMarkers(saved);
+    setMarkersRestored(saved.length);
+    // Widest preset the file genuinely fills, else the widest available. A
+    // truncated "30 days" showing 15 days of data is a bad first impression.
+    const full = result.windows.find((wd) => !wd.truncated);
+    setWindowKey((full ?? result.windows[0])?.key ?? '');
+    setCustom(null);
+  }, [result]);
+
+  const persist = useCallback(
+    (next: MealMarker[]) => {
+      setMarkers(next);
+      if (result) {
+        const ok = saveMarkers(result.datasetId, result.sourceName, next);
+        setStorageWorks(ok);
+      }
+    },
+    [result],
+  );
+
+  // Findings are recomputed on the server whenever the window, the medication
+  // answer or the meal markers change — one definition of every rule, and the
+  // rules never reach the browser.
+  useEffect(() => {
+    if (!result || !activeWindow || meds == null) return;
+    const seq = ++aiSeq.current;
+    setAiBusy(true);
+    const slice = readings.filter((r) => r.t >= activeWindow.from && r.t <= activeWindow.to);
+    const payload = {
+      result: { ...result, metrics: activeWindow.metrics ?? result.metrics, quality: { ...result.quality, spanDays: activeWindow.days, capturePct: activeWindow.capturePct }, lowEvents: activeWindow.lowEvents },
+      meds,
+      markers: markers.filter((m) => m.t >= activeWindow.from && m.t <= activeWindow.to),
+      responses: responses.filter((r) => markers.find((m) => m.id === r.markerId && m.t >= activeWindow.from && m.t <= activeWindow.to)),
+    };
+    fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+      .then((r) => r.json() as Promise<AiResponse>)
+      .then((json) => {
+        // A slow earlier request must not overwrite a newer answer.
+        if (seq === aiSeq.current) setAi(json);
+      })
+      .catch(() => {
+        if (seq === aiSeq.current) setAi({ reasonTh: 'เชื่อมต่อไม่ได้ — ลองเลือกช่วงเวลาใหม่อีกครั้ง' });
+      })
+      .finally(() => {
+        if (seq === aiSeq.current) setAiBusy(false);
+      });
+    // `slice` is only used for its length in the payload guard below.
+    void slice;
+  }, [result, activeWindow, meds, markers, responses, readings]);
+
+  if (!result) {
+    return <Uploader onResult={setResult} />;
+  }
+
+  const w = activeWindow;
+  const interp = ai?.interpretation;
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:px-6 sm:pb-8 lg:py-8">
+      <header className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-head text-[1.25rem] font-semibold tracking-tight sm:text-[1.35rem]">CGM Analyser</h1>
+          <p className="truncate text-[0.8rem] text-ink-40 sm:text-[0.83rem]">
+            {result.sourceName} · <span className="num">{result.quality.rowsUsed.toLocaleString('th-TH')} ค่า</span>
+            {' · '}
+            <span className="num">{fmtThaiDate(result.metrics.firstT)} – {fmtThaiDate(result.metrics.lastT, { year: true })}</span>
+          </p>
+        </div>
+        {/* Desktop keeps the actions in the header. On a phone they move to a
+            sticky bar at the bottom, within thumb reach and always visible after
+            a long scroll through the findings. */}
+        <div className="hidden gap-2 sm:flex">
+          <button
+            onClick={() => setExportOpen(true)}
+            disabled={!w || meds == null}
+            className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3.5 py-2.5 text-[0.86rem] font-medium text-ink transition hover:brightness-95 disabled:opacity-40"
+          >
+            <IconImage className="h-4 w-4" /> สร้างใบสรุปให้เคส
+          </button>
+          <button
+            onClick={() => { setResult(null); setAi(null); setMeds(null); }}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-white/70 px-3.5 py-2.5 text-[0.86rem] transition hover:bg-white"
+          >
+            <IconUpload className="h-4 w-4" /> เปลี่ยนไฟล์
+          </button>
+        </div>
+      </header>
+
+      {markersRestored > 0 && (
+        <p className="mb-4 flex items-start gap-2 rounded-md bg-zone-in/10 px-3.5 py-2.5 text-[0.85rem] text-zone-in-ink">
+          <IconInfo className="mt-0.5 h-4 w-4" />
+          พบมื้ออาหาร {markersRestored} รายการที่บันทึกไว้ในเครื่องนี้สำหรับไฟล์ชุดเดียวกัน — ดึงขึ้นมาให้แล้ว
+        </p>
+      )}
+
+      {meds == null ? (
+        <MedsQuestion onAnswer={setMeds} />
+      ) : (
+        <>
+          <QualityStrip result={result} />
+
+          <RangePicker
+            windows={result.windows}
+            activeKey={custom ? '__custom' : w?.key ?? ''}
+            custom={custom}
+            bounds={{ from: result.metrics.firstT, to: result.metrics.lastT }}
+            onPreset={(k) => { setCustom(null); setWindowKey(k); }}
+            onCustom={(from, to) => setCustom({ from, to })}
+          />
+
+          {w && (
+            <>
+              {w.gate.noteTh && (
+                <p className="mt-4 flex items-start gap-2 rounded-md bg-zone-high/12 px-3.5 py-2.5 text-[0.85rem] leading-relaxed text-zone-high-ink">
+                  <IconAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  {w.gate.noteTh}
+                </p>
+              )}
+
+              <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
+                <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h2 className="font-head text-[1.05rem] font-semibold">{w.labelTh}</h2>
+                  <SpanStrip w={w} intervalMinutes={result.quality.intervalMinutes} />
+                </div>
+                <GlucoseChart
+                  t={result.series.t}
+                  v={result.series.v}
+                  flag={result.series.flag}
+                  from={w.from}
+                  to={w.to}
+                  markers={markers}
+                  height={320}
+                />
+              </section>
+
+              <section className="mt-4">
+                <MetricGrid w={w} />
+              </section>
+
+              {w.metrics && (
+                <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
+                  <h2 className="mb-3 font-head text-[1.05rem] font-semibold">สัดส่วนเวลาในแต่ละช่วง</h2>
+                  <RangeBar m={w.metrics} showPercents={w.gate.showRangePercents} />
+                </section>
+              )}
+
+              {w.gate.showAgp && w.agp.length > 0 && (
+                <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
+                  <h2 className="font-head text-[1.05rem] font-semibold">ภาพวันปกติ</h2>
+                  <p className="mb-3 mt-1 text-[0.83rem] leading-relaxed text-ink-40">
+                    เอาทุกวันมาซ้อนกันบนแกน 24 ชั่วโมง — ตอบคำถามว่า “ช่วงไหนของวันที่มักมีปัญหา”
+                  </p>
+                  <AgpChart bins={w.agp} height={260} />
+                </section>
+              )}
+
+              <section className="mt-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <IconSparkle className="h-4 w-4 text-olive" />
+                  <h2 className="font-head text-[1.1rem] font-semibold">สิ่งที่ข้อมูลบอก</h2>
+                  {aiBusy && <span className="text-[0.8rem] text-ink-40">กำลังคำนวณ…</span>}
+                </div>
+
+                {interp && (
+                  <div className="glass mb-3 rounded-lg p-4 shadow-sm sm:p-5">
+                    <p className="font-head text-[1.05rem] font-medium leading-snug">{interp.headlineTh}</p>
+                    {ai?.narrative && (
+                      <p className="mt-2 whitespace-pre-wrap text-[0.92rem] leading-relaxed text-ink-70">{ai.narrative}</p>
+                    )}
+                    {!ai?.narrative && ai?.reasonTh && (
+                      <p className="mt-2 text-[0.82rem] text-ink-40">{ai.reasonTh}</p>
+                    )}
+                  </div>
+                )}
+
+                {interp && <Findings findings={interp.findings} />}
+
+                {interp && interp.limitationsTh.length > 0 && (
+                  <div className="mt-4 rounded-md border border-line bg-white/50 p-4">
+                    <h3 className="text-[0.85rem] font-medium text-ink-70">ข้อจำกัดที่ต้องบอกเคส</h3>
+                    <ul className="mt-1.5 space-y-1">
+                      {interp.limitationsTh.map((l, i) => (
+                        <li key={i} className="text-[0.83rem] leading-relaxed text-ink-70">· {l}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </section>
+
+              <section className="mt-5">
+                <MealPanel
+                  datasetId={result.datasetId}
+                  sourceName={result.sourceName}
+                  readings={readings}
+                  markers={markers}
+                  onChange={persist}
+                  defaultT={Math.round((w.from + w.to) / 2)}
+                  storageWorks={storageWorks}
+                />
+              </section>
+
+              <div className="glass-bar no-print fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-line px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
+                <button
+                  onClick={() => setExportOpen(true)}
+                  disabled={meds == null}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-gold px-3 py-3 text-[0.9rem] font-medium text-ink disabled:opacity-40"
+                >
+                  <IconImage className="h-4 w-4" /> ใบสรุปให้เคส
+                </button>
+                <button
+                  onClick={() => { setResult(null); setAi(null); setMeds(null); }}
+                  aria-label="เปลี่ยนไฟล์"
+                  className="inline-flex items-center justify-center rounded-sm border border-line bg-white/80 px-4 py-3"
+                >
+                  <IconUpload className="h-4 w-4" />
+                </button>
+              </div>
+
+              <ExportDialog
+                open={exportOpen}
+                onClose={() => setExportOpen(false)}
+                w={w}
+                readings={readings}
+                markers={markers}
+                findings={interp?.findings ?? []}
+                headlineTh={interp?.headlineTh ?? ''}
+                limitationsTh={interp?.limitationsTh ?? []}
+                narrative={ai?.narrative ?? null}
+              />
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Asked once, before any number appears. Whether the person is on a medicine that
+ * can drive glucose down changes what a reading of 62 means — a normal dip versus
+ * an event worth a phone call — and no amount of chart drawing recovers that.
+ */
+function MedsQuestion({ onAnswer }: { onAnswer: (m: GlucoseLoweringMeds) => void }) {
+  return (
+    <section className="glass mx-auto max-w-2xl rounded-lg p-6 shadow-md">
+      <h2 className="font-head text-[1.15rem] font-semibold">ก่อนดูผล — ขอถามข้อเดียว</h2>
+      <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-70">
+        เคสใช้ยาหรืออินซูลินที่ทำให้น้ำตาลลดอยู่หรือไม่ (เช่น ยาเบาหวานกลุ่มซัลโฟนิลยูเรีย หรืออินซูลิน)
+      </p>
+      <p className="mt-1.5 text-[0.83rem] leading-relaxed text-ink-40">
+        คำตอบนี้เปลี่ยนวิธีอ่านช่วงน้ำตาลต่ำ — ถ้าใช้ยาอยู่ ช่วงต่ำเป็นเรื่องที่ต้องให้แพทย์ดู ไม่ใช่เรื่องที่ปรับด้วยอาหารเอง
+      </p>
+      <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
+        <button onClick={() => onAnswer('yes')}
+          className="min-h-[3rem] rounded-sm bg-olive px-4 py-3 text-[0.92rem] font-medium text-white transition hover:bg-olive-dark">
+          ใช้อยู่
+        </button>
+        <button onClick={() => onAnswer('no')}
+          className="min-h-[3rem] rounded-sm border border-line bg-white/80 px-4 py-3 text-[0.92rem] transition hover:bg-white">
+          ไม่ใช้
+        </button>
+        <button onClick={() => onAnswer('unknown')}
+          className="min-h-[3rem] rounded-sm border border-line bg-white/80 px-4 py-3 text-[0.92rem] transition hover:bg-white">
+          ยังไม่ทราบ
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function QualityStrip({ result }: { result: AnalysisResult }) {
+  const q = result.quality;
+  const artifacts = q.qcNotes.filter((n) => n.kind === 'floor-artifact');
+  const items: string[] = [];
+  if (q.unitConverted) items.push(`ไฟล์เป็นหน่วย ${q.unitDetected} — แปลงเป็น มก./ดล. แล้ว`);
+  if (q.duplicatesDropped > 0) items.push(`เวลาซ้ำ ${q.duplicatesDropped} แถว`);
+  if (q.rejected.length > 0) items.push(`อ่านไม่ได้ ${q.rejected.length} แถว`);
+  if (artifacts.length > 0) items.push(`ช่วงที่เซนเซอร์น่าจะหลุด ${artifacts.length} ช่วง — ไม่นับในการคำนวณ`);
+  if (q.gaps.length > 0) items.push(`ช่วงที่ไม่มีข้อมูล ${q.gaps.length} ช่วง`);
+  if (items.length === 0) return null;
+
+  return (
+    <details className="glass mt-1 rounded-md px-4 py-3 text-[0.85rem] shadow-sm">
+      <summary className="cursor-pointer font-medium text-ink-70">
+        คุณภาพข้อมูล · มี {items.length} เรื่องที่ควรรู้
+      </summary>
+      <ul className="mt-2 space-y-1 text-ink-70">
+        {items.map((s, i) => <li key={i} className="num">· {s}</li>)}
+      </ul>
+    </details>
+  );
+}
+
+function RangePicker({
+  windows, activeKey, custom, bounds, onPreset, onCustom,
+}: {
+  windows: WindowSummaryWire[];
+  activeKey: string;
+  custom: { from: number; to: number } | null;
+  bounds: { from: number; to: number };
+  onPreset: (key: string) => void;
+  onCustom: (from: number, to: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState(() => toLocalInputValue(bounds.to - 1440));
+  const [to, setTo] = useState(() => toLocalInputValue(bounds.to));
+  const [err, setErr] = useState<string | null>(null);
+
+  function apply() {
+    const f = fromLocalInputValue(from);
+    const t = fromLocalInputValue(to);
+    if (f == null || t == null) { setErr('กรอกวันเวลาให้ครบก่อน'); return; }
+    if (t <= f) { setErr('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม'); return; }
+    if (t < bounds.from || f > bounds.to) {
+      setErr(`ช่วงนี้อยู่นอกไฟล์ — ไฟล์มีข้อมูล ${fmtDateTime(bounds.from)} ถึง ${fmtDateTime(bounds.to)}`);
+      return;
+    }
+    setErr(null);
+    onCustom(f, t);
+    setOpen(false);
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap gap-2">
+        {windows.map((w) => (
+          <button
+            key={w.key}
+            onClick={() => onPreset(w.key)}
+            aria-pressed={activeKey === w.key}
+            className={`num min-h-[2.6rem] rounded-full px-3.5 py-2 text-[0.85rem] transition ${
+              activeKey === w.key
+                ? 'bg-olive text-white shadow-sm'
+                : 'border border-line bg-white/70 text-ink-70 hover:bg-white'
+            }`}
+          >
+            {w.labelTh.replace('ล่าสุด', '')}
+            {w.truncated && <span className="ml-1 opacity-70">*</span>}
+          </button>
+        ))}
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-pressed={activeKey === '__custom'}
+          className={`inline-flex min-h-[2.6rem] items-center gap-1.5 rounded-full px-3.5 py-2 text-[0.85rem] transition ${
+            activeKey === '__custom' ? 'bg-olive text-white shadow-sm' : 'border border-line bg-white/70 text-ink-70 hover:bg-white'
+          }`}
+        >
+          <IconCalendar className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">
+            {custom ? `${fmtDateTime(custom.from)} – ${fmtDateTime(custom.to)}` : 'เลือกช่วงเอง'}
+          </span>
+          <span className="sm:hidden">{custom ? 'ช่วงที่เลือก' : 'เลือกช่วงเอง'}</span>
+        </button>
+      </div>
+      {windows.some((w) => w.truncated) && (
+        <p className="mt-1.5 text-[0.76rem] text-ink-40">* ไฟล์สั้นกว่าช่วงที่เลือก — แสดงเท่าที่มี</p>
+      )}
+
+      {open && (
+        <div className="glass mt-3 rounded-md p-4 shadow-sm">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[0.83rem] font-medium">ตั้งแต่</span>
+              <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)}
+                className="num mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+            </label>
+            <label className="block">
+              <span className="text-[0.83rem] font-medium">ถึง</span>
+              <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)}
+                className="num mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+            </label>
+          </div>
+          {err && <p role="alert" className="mt-2 text-[0.83rem] text-zone-vhigh-ink">{err}</p>}
+          <div className="mt-3 flex gap-2">
+            <button onClick={apply}
+              className="rounded-sm bg-olive px-4 py-2 text-[0.87rem] font-medium text-white transition hover:bg-olive-dark">
+              ดูช่วงนี้
+            </button>
+            <button onClick={() => setOpen(false)}
+              className="rounded-sm border border-line px-4 py-2 text-[0.87rem] transition hover:bg-white">
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A custom range is summarised in the browser from numbers the server already
+ * sent, except for the metrics — those come from the server's own slice via the
+ * findings call, so a hand-picked window never gets a second maths implementation.
+ */
+function buildCustomWindow(result: AnalysisResult, from: number, to: number): WindowSummaryWire {
+  const idx: number[] = [];
+  for (let i = 0; i < result.series.t.length; i++) {
+    const t = result.series.t[i];
+    if (t >= from && t <= to) idx.push(i);
+  }
+  const days = (to - from) / 1440;
+  const base = result.windows.find((w) => Math.abs(w.days - days) < 0.01);
+  return {
+    key: '__custom',
+    labelTh: `ช่วงที่เลือก · ${fmtDateTime(from)} – ${fmtDateTime(to)}`,  // wraps on narrow screens by design
+    from,
+    to,
+    days,
+    n: idx.length,
+    capturePct: base?.capturePct ?? 0,
+    metrics: null,
+    agp: [],
+    daily: [],
+    lowEvents: result.lowEvents.filter((e) => e.from >= from && e.to <= to),
+    gate: { showRangePercents: days >= 0.5, showCv: days >= 3, showGmi: false, showAgp: false, noteTh: null },
+    truncated: false,
+  };
+}
