@@ -56,8 +56,8 @@
 |---|---|---|
 | `UPCGM_SESSION_SECRET` | ✅ | HMAC ของ session cookie · อย่างน้อย 32 ตัวอักษร |
 | `UPCGM_PASSCODES` | ✅ | รายการรหัสเข้าใช้งาน `label:salt:hash[:YYYY-MM-DD]` คั่นด้วย comma |
-| `ANTHROPIC_API_KEY` | – | เปิดใช้ย่อหน้าเปิดบทสนทนาที่เรียบเรียงด้วย AI · ไม่ใส่ก็ใช้ได้ทุกอย่าง |
-| `UPCGM_AI_MODEL` | – | ค่าเริ่มต้น `claude-sonnet-5` |
+| `UPCGM_GEMINI_API_KEY` | – | คีย์กลางสำหรับทั้งระบบ · **ปกติไม่ต้องใส่** — โค้ชใส่คีย์ของตัวเองที่หน้า `/config` |
+| `UPCGM_AI_MODEL` | – | โมเดลสำรองเมื่อโค้ชไม่ได้เลือก · ค่าเริ่มต้น `gemini-flash-latest` |
 | `UPCGM_AI_DISABLED` | – | ตั้ง `1` เพื่อปิดการเรียก AI ทันทีโดยไม่ต้องลบ key |
 
 ### ออกรหัสให้โค้ชคนใหม่
@@ -81,7 +81,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```bash
 npm run dev        # localhost:4321
-npm test           # 139 tests
+npm test           # 158 tests
 npm run test:tz    # รันซ้ำใน UTC + Asia/Bangkok — เวลาเป็นจุดที่พลาดง่ายที่สุด
 npm run typecheck
 npm run build
@@ -112,6 +112,7 @@ server/              ไม่เคยส่งไป client
   cgm/window.ts      สรุปรายช่วง + gate ว่าช่วงนี้แสดงตัวเลขอะไรได้
   cgm/patterns.ts    จัดกลุ่มรูปกราฟหลังมื้อเป็น พุ่ง/กว้าง/ค้าง/ตก + สรุปภาพรวม
   cgm/excursions.ts  สแกนหาช่วงที่น้ำตาลขึ้นเองทั้งไฟล์ (ไม่ต้องรอโค้ชมาร์ก) แล้วส่งให้ patterns จัดกลุ่ม
+  cgm/agp-notes.ts   จุดบนกราฟภาพวันปกติ + ประโยคที่ balloon แสดง (กฎล้วน ไม่ใช้ AI)
   cgm/interpret.ts   ตัวเลข → ประโยคไทย · ทุกข้อมีที่มา · ห้ามพูดถึงยา/สินค้า
 components/          UI (glass · UP Wellness CI · responsive ตั้งแต่ 320px)
 ```

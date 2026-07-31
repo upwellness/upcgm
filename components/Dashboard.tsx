@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { aiEnabled, loadAiConfig, type AiConfig, EMPTY as EMPTY_AI } from '@/lib/ai-config';
 import { mealResponse, readingsFromWire } from '@/lib/meal-response';
 import { loadMarkers, saveMarkers } from '@/lib/markers-store';
 import { fmtDateTime, fmtThaiDate, fromLocalInputValue, toLocalInputValue } from '@/lib/time';
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
-import AgpChart from './AgpChart';
+import AgpChart, { type AgpNoteView } from './AgpChart';
 import ExportDialog from './ExportDialog';
 import Findings, { type FindingView } from './Findings';
 import GlucoseChart from './GlucoseChart';
@@ -26,6 +28,7 @@ interface AiResponse {
     perMeal: MealPatternView[];
     events: CgmEventView[];
     eventSnapshot: EventSnapshotView;
+    agpNotes: AgpNoteView[];
   };
   narrative?: string | null;
   reasonTh?: string | null;
@@ -42,7 +45,15 @@ export default function Dashboard() {
   const [aiBusy, setAiBusy] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [markersRestored, setMarkersRestored] = useState(0);
+  const [aiCfg, setAiCfg] = useState<AiConfig>(EMPTY_AI);
+  // Bumped by the button. The findings request runs on every change; the model
+  // is only asked when this goes up, so nothing leaves the machine unbidden.
+  const [narrativeNonce, setNarrativeNonce] = useState(0);
   const aiSeq = useRef(0);
+
+  useEffect(() => { setAiCfg(loadAiConfig()); }, []);
+
+  const aiOn = aiEnabled(aiCfg);
 
   const readings: Reading[] = useMemo(
     () => (result ? readingsFromWire(result.series) : []),
@@ -98,6 +109,9 @@ export default function Dashboard() {
       meds,
       markers: markers.filter((m) => m.t >= activeWindow.from && m.t <= activeWindow.to),
       responses: responses.filter((r) => markers.find((m) => m.id === r.markerId && m.t >= activeWindow.from && m.t <= activeWindow.to)),
+      wantNarrative: narrativeNonce > 0 && aiOn,
+      aiKey: aiOn ? aiCfg.apiKey : undefined,
+      aiModel: aiOn ? aiCfg.model : undefined,
     };
     fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       .then((r) => r.json() as Promise<AiResponse>)
@@ -113,7 +127,7 @@ export default function Dashboard() {
       });
     // `slice` is only used for its length in the payload guard below.
     void slice;
-  }, [result, activeWindow, meds, markers, responses, readings]);
+  }, [result, activeWindow, meds, markers, responses, readings, narrativeNonce, aiOn, aiCfg.apiKey, aiCfg.model]);
 
   if (!result) {
     return <Uploader onResult={setResult} />;
@@ -150,6 +164,14 @@ export default function Dashboard() {
           >
             <IconUpload className="h-4 w-4" /> เปลี่ยนไฟล์
           </button>
+          <Link
+            href="/config"
+            title={aiOn ? 'ตั้งค่า · เปิดใช้สรุปด้วย AI อยู่' : 'ตั้งค่า · ยังไม่ได้เปิดใช้ AI'}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-white/70 px-3 py-2.5 text-[0.86rem] transition hover:bg-white"
+          >
+            ตั้งค่า
+            {aiOn && <span className="h-1.5 w-1.5 rounded-full bg-zone-in" aria-label="เปิดใช้ AI อยู่" />}
+          </Link>
         </div>
       </header>
 
@@ -217,7 +239,12 @@ export default function Dashboard() {
                   <p className="mb-3 mt-1 text-[0.83rem] leading-relaxed text-ink-40">
                     เอาทุกวันมาซ้อนกันบนแกน 24 ชั่วโมง — ตอบคำถามว่า “ช่วงไหนของวันที่มักมีปัญหา”
                   </p>
-                  <AgpChart bins={w.agp} height={260} />
+                  <AgpChart bins={w.agp} height={260} notes={interp?.agpNotes ?? []} />
+                  {(interp?.agpNotes?.length ?? 0) > 0 && (
+                    <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-40">
+                      จุดบนกราฟคือช่วงเวลาที่มีอะไรน่าสังเกต — แตะหรือเอาเมาส์ไปวางเพื่อดูว่าเรื่องอะไร
+                    </p>
+                  )}
                 </section>
               )}
 
@@ -226,6 +253,23 @@ export default function Dashboard() {
                   <IconSparkle className="h-4 w-4 text-olive" />
                   <h2 className="font-head text-[1.1rem] font-semibold">สิ่งที่ข้อมูลบอก</h2>
                   {aiBusy && <span className="text-[0.8rem] text-ink-40">กำลังคำนวณ…</span>}
+                  <div className="ml-auto">
+                    {aiOn ? (
+                      <button
+                        onClick={() => setNarrativeNonce((n) => n + 1)}
+                        disabled={aiBusy}
+                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-olive/40 bg-white/70 px-3 py-1.5 text-[0.82rem] font-medium text-olive transition hover:bg-white disabled:opacity-40"
+                      >
+                        <IconSparkle className="h-3.5 w-3.5" />
+                        {narrativeNonce > 0 ? 'สรุปใหม่ด้วย AI' : 'สรุปด้วย AI'}
+                      </button>
+                    ) : (
+                      <Link href="/config"
+                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-line bg-white/60 px-3 py-1.5 text-[0.8rem] text-ink-40 transition hover:bg-white">
+                        เปิดใช้สรุปด้วย AI →
+                      </Link>
+                    )}
+                  </div>
                 </div>
 
                 {interp && (

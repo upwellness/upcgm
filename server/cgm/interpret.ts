@@ -4,6 +4,7 @@ import { readingsFromWire } from '@/lib/meal-response';
 import { DEVICE_FLOOR, TARGETS_ADULT_DIABETES, gateForWindow } from './thresholds';
 import { PATTERNS, analysePatterns, type MealPattern, type PatternSnapshot } from './patterns';
 import { analyseEvents, type CgmEvent, type EventSnapshot } from './excursions';
+import { buildAgpNotes, type AgpNote } from './agp-notes';
 
 /**
  * Turning numbers into sentences is where a tool like this either earns trust or
@@ -47,6 +48,8 @@ export interface Interpretation {
   events: CgmEvent[];
   /** rollup over `events`; this is the one the screen leads with */
   eventSnapshot: EventSnapshot;
+  /** dots to hang on the AGP, each with the sentence its tooltip shows */
+  agpNotes: AgpNote[];
 }
 
 const pct = (n: number) => `${n.toFixed(1)}%`;
@@ -330,7 +333,9 @@ export function interpret(
   }
 
   const headlineTh = buildHeadline(m, gate.showRangePercents, escalate);
-  return { headlineTh, findings, limitationsTh, escalate, patterns, perMeal, events, eventSnapshot };
+  const agpNotes = gate.showAgp ? buildAgpNotes(result.agp, events) : [];
+
+  return { headlineTh, findings, limitationsTh, escalate, patterns, perMeal, events, eventSnapshot, agpNotes };
 }
 
 function buildHeadline(

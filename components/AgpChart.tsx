@@ -1,8 +1,19 @@
 'use client';
 
-import { GRID_LINES, Y_MAX, Y_MIN } from '@/lib/bands';
+import { useState } from 'react';
+import { GRID_LINES, PATTERN_STYLE, Y_MAX, Y_MIN, type PatternKey } from '@/lib/bands';
 import { useElementWidth } from '@/lib/use-width';
 import type { AgpBin } from '@/lib/types';
+
+/** Wire shape of AgpNote from server/cgm/agp-notes.ts. */
+export interface AgpNoteView {
+  minute: number;
+  atValue: number;
+  kind: 'shape-cluster' | 'widest' | 'highest' | 'lowest' | 'overnight';
+  pattern: PatternKey | null;
+  titleTh: string;
+  bodyTh: string;
+}
 
 /**
  * The AGP: every day of the wear folded onto one 24-hour axis, showing the shape
@@ -13,8 +24,11 @@ import type { AgpBin } from '@/lib/types';
  * computed from two points looks exactly as confident as one from two hundred.
  */
 
-export default function AgpChart({ bins, height = 250 }: { bins: AgpBin[]; height?: number }) {
+export default function AgpChart({
+  bins, height = 250, notes = [], staticMode = false,
+}: { bins: AgpBin[]; height?: number; notes?: AgpNoteView[]; staticMode?: boolean }) {
   const [wrapRef, measured] = useElementWidth<HTMLDivElement>(900);
+  const [open, setOpen] = useState<number | null>(null);
   const W = Math.max(320, measured);
   const narrow = W < 520;
   const PAD = narrow
@@ -60,7 +74,7 @@ export default function AgpChart({ bins, height = 250 }: { bins: AgpBin[]; heigh
   const lowConf = usable.filter((b) => b.lowConfidence);
 
   return (
-    <div ref={wrapRef} className="w-full">
+    <div ref={wrapRef} className="relative w-full">
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto', display: 'block' }} role="img"
       aria-label="ภาพรวมวันปกติ แสดงช่วงกระจายของน้ำตาลตามเวลาในแต่ละวัน">
       <rect x={PAD.left} y={y(180)} width={plotW} height={Math.max(0, y(70) - y(180))} fill="rgba(62,142,90,.08)" />
@@ -91,7 +105,54 @@ export default function AgpChart({ bins, height = 250 }: { bins: AgpBin[]; heigh
       {lowConf.map((b) => (
         <rect key={b.minute} x={x(b.minute) - 2} y={PAD.top} width={4} height={plotH} fill="rgba(247,244,238,.55)" />
       ))}
+
+      {/* Notable moments. Rule-based, so they are here with or without an API key. */}
+      {notes.map((n) => {
+        const cx = x(n.minute);
+        const cy = y(n.atValue);
+        const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : '#9A7620';
+        const isOpen = open === n.minute;
+        return (
+          <g key={n.minute}
+            className={staticMode ? undefined : 'cursor-pointer'}
+            onMouseEnter={staticMode ? undefined : () => setOpen(n.minute)}
+            onMouseLeave={staticMode ? undefined : () => setOpen((v) => (v === n.minute ? null : v))}
+            onClick={staticMode ? undefined : () => setOpen((v) => (v === n.minute ? null : n.minute))}
+            tabIndex={staticMode ? undefined : 0}
+            onFocus={staticMode ? undefined : () => setOpen(n.minute)}
+            onBlur={staticMode ? undefined : () => setOpen((v) => (v === n.minute ? null : v))}
+            role={staticMode ? undefined : 'button'}
+            aria-label={`${n.titleTh} — ${n.bodyTh}`}
+          >
+            {/* a generous invisible target: 8px of visible dot is not a tap target */}
+            <circle cx={cx} cy={cy} r={16} fill="transparent" />
+            <circle cx={cx} cy={cy} r={isOpen ? 7 : 5.5} fill={tone} stroke="#fff" strokeWidth="2" />
+          </g>
+        );
+      })}
     </svg>
+
+    {/* The balloon lives in HTML, not SVG: Thai text needs real wrapping, and
+        foreignObject inside an exported canvas is a known source of blank boxes. */}
+    {!staticMode && open != null && (() => {
+      const n = notes.find((z) => z.minute === open);
+      if (!n) return null;
+      const leftPct = (x(n.minute) / W) * 100;
+      const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : '#9A7620';
+      return (
+        <div
+          role="status"
+          className="pointer-events-none absolute z-20 w-[min(19rem,78vw)] rounded-md border border-line bg-white/97 px-3 py-2.5 shadow-lg"
+          style={{
+            left: `clamp(0.5rem, ${leftPct}% - 9.5rem, calc(100% - min(19rem,78vw) - 0.5rem))`,
+            top: `${((y(n.atValue) + 14) / H) * 100}%`,
+          }}
+        >
+          <div className="text-[0.82rem] font-semibold" style={{ color: tone }}>{n.titleTh}</div>
+          <div className="mt-0.5 text-[0.79rem] leading-relaxed text-ink-70">{n.bodyTh}</div>
+        </div>
+      );
+    })()}
     </div>
   );
 }

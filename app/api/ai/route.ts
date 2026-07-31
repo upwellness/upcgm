@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, MealResponse } from '@/lib/types';
 import { interpret } from '@/server/cgm/interpret';
+import { PATTERNS } from '@/server/cgm/patterns';
 import { clientKey, rateLimit } from '@/server/rate-limit';
 
 export const runtime = 'nodejs';
@@ -17,7 +18,11 @@ export const maxDuration = 30;
  * being up to say something true about a low blood sugar.
  */
 
-const MODEL = process.env.UPCGM_AI_MODEL ?? 'claude-sonnet-5';
+/**
+ * The coach brings the key and picks the model on /config. The env var is only a
+ * fallback for a deployment that wants one key for everybody.
+ */
+const FALLBACK_MODEL = process.env.UPCGM_AI_MODEL ?? 'gemini-flash-latest';
 
 /** Anything the model must not say, regardless of how the numbers look. */
 const FORBIDDEN = [
@@ -39,6 +44,12 @@ interface Body {
   meds?: GlucoseLoweringMeds;
   markers?: MealMarker[];
   responses?: MealResponse[];
+  /** the coach's own Gemini key, held in their browser, used once, never stored */
+  aiKey?: string;
+  aiModel?: string;
+  /** true only when the coach pressed the button, so the findings render without
+   *  ever calling out to a third party on their own */
+  wantNarrative?: boolean;
 }
 
 export async function POST(req: Request) {
@@ -58,12 +69,25 @@ export async function POST(req: Request) {
     responses: body.responses,
   });
 
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || process.env.UPCGM_AI_DISABLED === '1') {
+  // The findings are always returned. The model call happens only when the coach
+  // asked for it AND supplied a key — this route must never reach out to anyone
+  // just because a chart was re-ranged.
+  const key = (body.aiKey ?? '').trim() || (process.env.UPCGM_GEMINI_API_KEY ?? '').trim();
+  const model = (body.aiModel ?? '').trim() || FALLBACK_MODEL;
+
+  if (!body.wantNarrative) {
+    return NextResponse.json({ interpretation, narrative: null, reasonTh: null });
+  }
+  if (process.env.UPCGM_AI_DISABLED === '1') {
     return NextResponse.json({
-      interpretation,
-      narrative: null,
-      reasonTh: 'ยังไม่ได้เปิดใช้สรุปด้วย AI — ข้อค้นพบทั้งหมดด้านล่างคำนวณจากเกณฑ์ตรง ๆ อยู่แล้ว',
+      interpretation, narrative: null,
+      reasonTh: 'ปิดการใช้ AI ไว้ที่ระบบ — ข้อค้นพบทั้งหมดด้านล่างคำนวณจากเกณฑ์ตรง ๆ อยู่แล้ว',
+    });
+  }
+  if (!key) {
+    return NextResponse.json({
+      interpretation, narrative: null,
+      reasonTh: 'ยังไม่ได้ใส่ API key — ไปที่หน้าตั้งค่าเพื่อเปิดใช้สรุปด้วย AI (ไม่ใส่ก็ใช้งานได้ครบทุกอย่าง)',
     });
   }
 
@@ -91,6 +115,15 @@ export async function POST(req: Request) {
     `CV = ${m.cv.toFixed(1)}%`,
     m.gmi != null ? `GMI ≈ ${m.gmi.toFixed(1)}%` : 'ช่วงข้อมูลสั้นเกินกว่าจะคิด GMI',
     `ใช้ยาลดน้ำตาลอยู่: ${body.meds === 'yes' ? 'ใช่' : body.meds === 'no' ? 'ไม่' : 'ไม่ระบุ'}`,
+    `รูปร่างกราฟหลังน้ำตาลขึ้น (คำที่ทีมตั้งเอง ไม่ใช่ศัพท์การแพทย์): ` +
+      (['crash', 'stuck', 'spike', 'wide', 'flat'] as const)
+        .filter((k) => interpretation.eventSnapshot.counts[k] > 0)
+        .map((k) => `${PATTERNS[k].labelTh} ${interpretation.eventSnapshot.counts[k]} ครั้ง`)
+        .join(' · ') || 'ยังไม่พบช่วงที่อ่านรูปร่างได้',
+    interpretation.eventSnapshot.dominant
+      ? `รูปร่างที่เจอบ่อยที่สุด: ${PATTERNS[interpretation.eventSnapshot.dominant].labelTh} — ${PATTERNS[interpretation.eventSnapshot.dominant].meaningTh}`
+      : 'ยังไม่มีรูปร่างไหนเด่นพอจะบอกว่าเป็นแพตเทิร์นประจำ',
+    `จำนวนช่วงที่มาจากการสแกนเอง (ยืนยันไม่ได้ว่าเป็นอาหาร): ${interpretation.eventSnapshot.detected} · ที่โค้ชบันทึกเอง: ${interpretation.eventSnapshot.marked}`,
     ...interpretation.findings.map((f) => `[${f.severity}] ${f.titleTh} — ${f.evidenceTh}`),
   ].join('\n');
 
@@ -101,6 +134,8 @@ export async function POST(req: Request) {
     'ย่อหน้าสอง: สิ่งที่ควรลองก่อน 1 อย่าง เป็นพฤติกรรม (อาหาร/ลำดับการกิน/เดินหลังมื้อ/การนอน) เท่านั้น',
     'ห้ามพูดถึงยา ขนาดยา การปรับยา การวินิจฉัยโรค ผลิตภัณฑ์ อาหารเสริม หรือการซื้อขาย',
     'ห้ามสร้างตัวเลขใหม่ ใช้เฉพาะตัวเลขที่ให้มา',
+    'ถ้าพูดถึงรูปร่างกราฟ ให้ใช้คำว่า พุ่ง/กว้าง/ค้าง/ตก ตามที่ให้มา และอย่าอ้างว่าเป็นศัพท์ทางการแพทย์',
+    'ช่วงที่มาจากการสแกนเอง ห้ามเรียกว่า "มื้ออาหาร" เพราะยืนยันไม่ได้ว่ามาจากอาหาร — เรียกว่า "ช่วงที่น้ำตาลขึ้น"',
     'ถ้าข้อค้นพบมีระดับ urgent ให้ขึ้นต้นด้วยการแนะนำให้ปรึกษาแพทย์',
     'ตอบเป็นข้อความล้วน ไม่ใส่หัวข้อ ไม่ใส่ bullet',
   ].join('\n');
@@ -108,28 +143,37 @@ export async function POST(req: Request) {
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 20_000);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: 'user', parts: [{ text: facts }] }],
+          generationConfig: { maxOutputTokens: 700, temperature: 0.4 },
+        }),
+        signal: ctl.signal,
       },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 600,
-        system,
-        messages: [{ role: 'user', content: facts }],
-      }),
-      signal: ctl.signal,
-    });
+    );
     clearTimeout(timer);
 
     if (!res.ok) {
-      return NextResponse.json({ interpretation, narrative: null, reasonTh: 'เรียกสรุปด้วย AI ไม่สำเร็จ — ใช้ข้อค้นพบตามเกณฑ์ด้านล่างได้เลย' });
+      // Pass Google's own words through. "API key not valid" and "model not
+      // found" need different fixes, and a generic failure message sends the
+      // coach to the wrong one.
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return NextResponse.json({
+        interpretation,
+        narrative: null,
+        reasonTh: `เรียกสรุปด้วย AI ไม่สำเร็จ — Google ตอบว่า: ${err?.error?.message ?? `HTTP ${res.status}`} · ข้อค้นพบตามเกณฑ์ด้านล่างใช้ได้ตามปกติ`,
+      });
     }
-    const json = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
-    const text = (json.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
+    const json = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = (json.candidates?.[0]?.content?.parts ?? [])
+      .map((p) => p.text ?? '').join('\n').trim();
     if (!text) {
       return NextResponse.json({ interpretation, narrative: null, reasonTh: 'ไม่ได้ข้อความกลับมา' });
     }
