@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { asLocale, tx } from '@/server/cgm/i18n';
 import { analyse } from '@/server/cgm/analyse';
 import { ParseError } from '@/server/cgm/parse';
 import { clientKey, rateLimit } from '@/server/rate-limit';
@@ -18,10 +19,12 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * The file itself is read from the request stream and never written to disk.
  */
 export async function POST(req: Request) {
+  let locale = asLocale(req.headers.get('x-upcgm-locale'));
+  let t = tx(locale);
   const verdict = rateLimit(`analyse:${clientKey(req.headers)}`, 30, 600);
   if (!verdict.allowed) {
     return NextResponse.json(
-      { error: 'too-many', messageTh: `อัปโหลดถี่เกินไป รออีก ${verdict.retryAfterSeconds} วินาที` },
+      { error: 'too-many', messageTh: t(`อัปโหลดถี่เกินไป รออีก ${verdict.retryAfterSeconds} วินาที`, `Too many uploads — wait ${verdict.retryAfterSeconds} seconds.`) },
       { status: 429, headers: { 'Retry-After': String(verdict.retryAfterSeconds) } },
     );
   }
@@ -29,7 +32,7 @@ export async function POST(req: Request) {
   const declared = Number(req.headers.get('content-length') ?? '0');
   if (declared > MAX_BYTES + 4096) {
     return NextResponse.json(
-      { error: 'too-large', messageTh: 'ไฟล์ใหญ่เกิน 5 MB — ไฟล์ CGM ปกติไม่ถึง 1 MB' },
+      { error: 'too-large', messageTh: t('ไฟล์ใหญ่เกิน 5 MB — ไฟล์ CGM ปกติไม่ถึง 1 MB', 'Larger than 5 MB — a normal CGM export is under 1 MB.') },
       { status: 413 },
     );
   }
@@ -37,23 +40,25 @@ export async function POST(req: Request) {
   let file: File | null = null;
   try {
     const form = await req.formData();
+    locale = asLocale(form.get('locale'));
+    t = tx(locale);
     const f = form.get('file');
     if (f instanceof File) file = f;
   } catch {
-    return NextResponse.json({ error: 'bad-form', messageTh: 'อ่านไฟล์ที่ส่งมาไม่ได้' }, { status: 400 });
+    return NextResponse.json({ error: 'bad-form', messageTh: t('อ่านไฟล์ที่ส่งมาไม่ได้', 'Could not read the submitted file.') }, { status: 400 });
   }
 
   if (!file) {
-    return NextResponse.json({ error: 'no-file', messageTh: 'ยังไม่ได้เลือกไฟล์' }, { status: 400 });
+    return NextResponse.json({ error: 'no-file', messageTh: t('ยังไม่ได้เลือกไฟล์', 'No file chosen.') }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'too-large', messageTh: 'ไฟล์ใหญ่เกิน 5 MB' }, { status: 413 });
+    return NextResponse.json({ error: 'too-large', messageTh: t('ไฟล์ใหญ่เกิน 5 MB', 'Larger than 5 MB.') }, { status: 413 });
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
 
   try {
-    const result = analyse(buf, file.name || 'upload.xlsx');
+    const result = analyse(buf, file.name || 'upload.xlsx', locale);
     return NextResponse.json(result, {
       // Health data in a shared browser cache is the kind of mistake that only
       // shows up when the wrong person opens the wrong tab.

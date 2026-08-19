@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useT } from './PrefsProvider';
 import { useElementWidth } from '@/lib/use-width';
 import { BANDS, GRID_LINES, Y_MAX, Y_MIN, bandOf } from '@/lib/bands';
 import { fmtDateTime, fmtTime, minuteOfDay } from '@/lib/time';
@@ -32,6 +33,7 @@ const padFor = (w: number) =>
 export default function GlucoseChart({
   t, v, flag, from, to, markers = [], gapMinutes = 20, height = 300, onMarkerClick, staticMode = false,
 }: Props) {
+  const tr = useT();
   const [wrapRef, measured] = useElementWidth<HTMLDivElement>(900);
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
 
@@ -124,7 +126,7 @@ export default function GlucoseChart({
         className="w-full touch-pan-y"
         style={{ height: 'auto', display: 'block' }}
         role="img"
-        aria-label={`กราฟน้ำตาลตั้งแต่ ${fmtDateTime(from)} ถึง ${fmtDateTime(to)}`}
+        aria-label={tr(`กราฟน้ำตาลตั้งแต่ ${fmtDateTime(from)} ถึง ${fmtDateTime(to)}`, `Glucose from ${fmtDateTime(from)} to ${fmtDateTime(to)}`)}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >
@@ -192,7 +194,7 @@ export default function GlucoseChart({
                   className={staticMode ? undefined : 'cursor-pointer'}
                   onClick={staticMode ? undefined : () => onMarkerClick?.(mk.id)}
                   role={staticMode ? undefined : 'button'}
-                  aria-label={staticMode ? undefined : `มื้อ ${mk.label} เวลา ${fmtTime(mk.t)}`}
+                  aria-label={staticMode ? undefined : tr(`มื้อ ${mk.label} เวลา ${fmtTime(mk.t)}`, `Meal ${mk.label} at ${fmtTime(mk.t)}`)}
                 >
                   <line x1={x(mk.t)} x2={x(mk.t)} y1={PAD.top} y2={laneY} stroke="rgb(var(--c-gold-ink))" strokeWidth="1" strokeDasharray="3 3" />
                   <circle cx={x(mk.t)} cy={laneY + 7} r={narrow ? 8 : 6} fill="rgb(var(--c-gold))" />
@@ -217,7 +219,7 @@ export default function GlucoseChart({
           className="pointer-events-none absolute top-1 -translate-x-1/2 rounded-sm bg-tooltip/95 px-2.5 py-1.5 text-[0.76rem] leading-tight text-accent-ink shadow-md"
           style={{ left: `${tipLeft}%` }}
         >
-          <div className="num font-semibold">{hv.v} มก./ดล.</div>
+          <div className="num font-semibold">{hv.v} {tr('มก./ดล.', 'mg/dL')}</div>
           <div className="opacity-80">{fmtDateTime(hv.t)}</div>
           {hv.flag !== 'ok' && <div className="mt-0.5 text-[0.7rem] text-gold">{flagLabel(hv.flag)}</div>}
         </div>

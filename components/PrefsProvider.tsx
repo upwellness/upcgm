@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { translate, type MsgKey } from '@/lib/i18n';
+import { tx, type T } from '@/lib/i18n';
 import {
   applyPrefs, DEFAULTS, FONT_STEPS, loadPrefs, savePrefs,
   type Locale, type Prefs, type Theme,
@@ -9,7 +9,7 @@ import {
 
 type Ctx = {
   prefs: Prefs;
-  t: (key: MsgKey, vars?: Record<string, string | number>) => string;
+  t: T;
   setLocale: (l: Locale) => void;
   setTheme: (t: Theme) => void;
   setFontScale: (n: number) => void;
@@ -45,7 +45,7 @@ export function PrefsProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     prefs,
     ready,
-    t: (key, vars) => translate(prefs.locale, key, vars),
+    t: tx(prefs.locale),
     setLocale: (locale) => update({ locale }),
     setTheme: (theme) => update({ theme }),
     setFontScale: (fontScale) => update({ fontScale }),

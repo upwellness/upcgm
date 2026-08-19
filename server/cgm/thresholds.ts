@@ -1,3 +1,4 @@
+import { tx, type Locale, type T } from './i18n';
 /**
  * Every number the UI can show has to declare where it came from. Anything we
  * chose ourselves says so, in Thai, on screen — a coach must never present our
@@ -21,10 +22,20 @@ export interface Threshold {
   sourceTh: string;
 }
 
-export const SOURCE_ATTD =
-  'ฉันทามติสากลเรื่อง Time in Range (Battelino et al., Diabetes Care 2019) ซึ่ง ADA Standards of Care รับมาใช้';
+export const sourceAttd = (t: T) =>
+  t(
+    'ฉันทามติสากลเรื่อง Time in Range (Battelino et al., Diabetes Care 2019) ซึ่ง ADA Standards of Care รับมาใช้',
+    'International consensus on Time in Range (Battelino et al., Diabetes Care 2019), adopted by the ADA Standards of Care',
+  );
+/** @deprecated Thai-only; kept for the internal tables that never reach a screen. */
+export const SOURCE_ATTD = sourceAttd(tx('th'));
 export const SOURCE_GMI = 'Bergenstal et al., Diabetes Care 2018';
-export const SOURCE_HOUSE = 'เกณฑ์ที่ทีม UP Wellness กำหนดขึ้นเอง — ยังไม่ใช่มาตรฐานสากล';
+export const sourceHouse = (t: T) =>
+  t(
+    'เกณฑ์ที่ทีม UP Wellness กำหนดขึ้นเอง — ยังไม่ใช่มาตรฐานสากล',
+    'A threshold the UP Wellness team set ourselves — not an international standard',
+  );
+export const SOURCE_HOUSE = sourceHouse(tx('th'));
 
 /** Device reporting floor/ceiling for Ottai CGM. */
 export const DEVICE_FLOOR = 36;
@@ -128,29 +139,42 @@ export interface MetricGate {
   noteTh: string | null;
 }
 
-export function gateForWindow(days: number, capturePct: number): MetricGate {
+export function gateForWindow(days: number, capturePct: number, locale: Locale = 'th'): MetricGate {
+  const t = tx(locale);
   if (days < 0.5) {
     return {
       showRangePercents: false, showCv: false, showGmi: false, showAgp: false,
-      noteTh: 'ช่วงเวลานี้สั้นเกินกว่าจะสรุปเป็นตัวชี้วัดได้ — ดูรูปกราฟและค่าสูงสุด/ต่ำสุดได้ แต่ยังคิด % เวลาไม่ได้',
+      noteTh: t(
+        'ช่วงเวลานี้สั้นเกินกว่าจะสรุปเป็นตัวชี้วัดได้ — ดูรูปกราฟและค่าสูงสุด/ต่ำสุดได้ แต่ยังคิด % เวลาไม่ได้',
+        'This window is too short to summarise as metrics — the chart and the highest/lowest readings still hold, but percentages of time do not.',
+      ),
     };
   }
   if (days < 3) {
     return {
       showRangePercents: true, showCv: false, showGmi: false, showAgp: false,
-      noteTh: 'ช่วงเวลาสั้น — % เวลาที่แสดงเป็นของช่วงนี้เท่านั้น ยังไม่ใช่ภาพพฤติกรรมโดยรวม',
+      noteTh: t(
+        'ช่วงเวลาสั้น — % เวลาที่แสดงเป็นของช่วงนี้เท่านั้น ยังไม่ใช่ภาพพฤติกรรมโดยรวม',
+        'Short window — the percentages describe this stretch only, not the overall pattern.',
+      ),
     };
   }
   if (days < MIN_DAYS_FOR_METRICS) {
     return {
       showRangePercents: true, showCv: true, showGmi: true, showAgp: days >= 7,
-      noteTh: `มีข้อมูล ${days.toFixed(1)} วัน — มาตรฐานสากลแนะนำอย่างน้อย ${MIN_DAYS_FOR_METRICS} วัน ตัวเลขจึงอ่านเป็นแนวโน้มได้ แต่ยังไม่ควรใช้เทียบเกณฑ์แบบเป๊ะ ๆ`,
+      noteTh: t(
+        `มีข้อมูล ${days.toFixed(1)} วัน — มาตรฐานสากลแนะนำอย่างน้อย ${MIN_DAYS_FOR_METRICS} วัน ตัวเลขจึงอ่านเป็นแนวโน้มได้ แต่ยังไม่ควรใช้เทียบเกณฑ์แบบเป๊ะ ๆ`,
+        `${days.toFixed(1)} days of data — the consensus asks for at least ${MIN_DAYS_FOR_METRICS}. Read these numbers as a direction of travel, not as a score to compare against targets.`,
+      ),
     };
   }
   if (capturePct < MIN_CAPTURE_PCT) {
     return {
       showRangePercents: true, showCv: true, showGmi: false, showAgp: true,
-      noteTh: `ข้อมูลครบเพียง ${capturePct.toFixed(0)}% ของช่วงเวลา (มาตรฐานแนะนำไม่น้อยกว่า ${MIN_CAPTURE_PCT}%) — ตัวเลขอาจไม่แทนพฤติกรรมจริง`,
+      noteTh: t(
+        `ข้อมูลครบเพียง ${capturePct.toFixed(0)}% ของช่วงเวลา (มาตรฐานแนะนำไม่น้อยกว่า ${MIN_CAPTURE_PCT}%) — ตัวเลขอาจไม่แทนพฤติกรรมจริง`,
+        `The sensor covered only ${capturePct.toFixed(0)}% of this window (the standard asks for ${MIN_CAPTURE_PCT}% or more) — the numbers may not represent what actually happened.`,
+      ),
     };
   }
   return { showRangePercents: true, showCv: true, showGmi: true, showAgp: true, noteTh: null };

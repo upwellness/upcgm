@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { type Locale } from './i18n';
 import type { AnalysisResult, DataQuality, Reading } from '@/lib/types';
 import { parseWorkbook } from './parse';
 import { classifyFloorRuns, detectInterval, findGaps, flagSpikes, isMetricGrade } from './qc';
@@ -23,7 +24,7 @@ function fingerprint(readings: Reading[]): string {
     .slice(0, 16);
 }
 
-export function analyse(buf: Buffer, sourceName: string): AnalysisResult {
+export function analyse(buf: Buffer, sourceName: string, locale: Locale = 'th'): AnalysisResult {
   const parsed = parseWorkbook(buf, sourceName);
   const readings = parsed.readings;
 
@@ -39,7 +40,7 @@ export function analyse(buf: Buffer, sourceName: string): AnalysisResult {
   const expected = Math.floor(spanMinutes / intervalMinutes) + 1;
   const capturePct = expected > 0 ? (readings.length / expected) * 100 : 0;
 
-  const metrics = computeMetrics(readings);
+  const metrics = computeMetrics(readings, locale);
   if (!metrics) {
     throw new Error('ไม่มีค่าที่ใช้คำนวณได้หลังตรวจคุณภาพข้อมูล');
   }
@@ -78,6 +79,6 @@ export function analyse(buf: Buffer, sourceName: string): AnalysisResult {
     lowEvents: findLowEvents(readings),
     // Every preset is computed in this one pass so switching range on screen is
     // instant and cannot drift from the full-file numbers.
-    windows: presetWindows(readings),
+    windows: presetWindows(readings, locale),
   };
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { SEVERITY_STYLE } from '@/lib/bands';
+import { useT } from './PrefsProvider';
 import { IconAlert, IconCheck, IconEye, IconInfo } from './Icons';
 
 export interface FindingView {
@@ -20,6 +21,7 @@ const GLYPH: Record<FindingView['severity'], React.ReactNode> = {
 };
 
 export default function Findings({ findings }: { findings: FindingView[] }) {
+  const t = useT();
   if (findings.length === 0) return null;
   return (
     <ol className="space-y-3">
@@ -38,16 +40,16 @@ export default function Findings({ findings }: { findings: FindingView[] }) {
                   </span>
                   {f.basis === 'house' && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"
-                      title="เกณฑ์นี้ทีม UP Wellness กำหนดขึ้นเอง ยังไม่ใช่มาตรฐานสากล">
+                      title={t('เกณฑ์นี้ทีม UP Wellness กำหนดขึ้นเอง ยังไม่ใช่มาตรฐานสากล', 'A threshold the UP Wellness team set ourselves — not an international standard')}>
                       <IconInfo className="h-3 w-3" />
-                      เกณฑ์ของเราเอง
+                      {t('เกณฑ์ของเราเอง', 'Our own threshold')}
                     </span>
                   )}
                 </div>
                 <p className="num mt-1.5 text-[0.87rem] leading-relaxed text-ink-70">{f.evidenceTh}</p>
                 {f.actionTh && (
                   <p className="mt-2 rounded-sm bg-surface-sunken px-3 py-2 text-[0.87rem] leading-relaxed">
-                    <span className="font-medium text-olive">ทำต่อ · </span>
+                    <span className="font-medium text-olive">{t('ทำต่อ · ', 'Next · ')}</span>
                     {f.actionTh}
                   </p>
                 )}

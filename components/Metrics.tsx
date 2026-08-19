@@ -1,6 +1,7 @@
 'use client';
 
-import { BANDS, fmtPct } from '@/lib/bands';
+import { BANDS, fmtPct, bandLabel } from '@/lib/bands';
+import { usePrefs, useT } from './PrefsProvider';
 import { fmtDuration, pctToMinutesPerDay } from '@/lib/time';
 import type { Metrics, WindowSummaryWire } from '@/lib/types';
 import {
@@ -12,6 +13,8 @@ const pc = (n: number) => fmtPct(n, 1);
 const barLabel = (p: number) => fmtPct(p, 0);
 
 export function RangeBar({ m, showPercents }: { m: Metrics; showPercents: boolean }) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const parts = [
     { band: BANDS[0], pct: m.tbrUnder54 },
     { band: BANDS[1], pct: m.tbrUnder70 - m.tbrUnder54 },
@@ -23,7 +26,7 @@ export function RangeBar({ m, showPercents }: { m: Metrics; showPercents: boolea
   return (
     <div>
       <div className="flex h-9 w-full overflow-hidden rounded-sm bg-surface-sunken" role="img"
-        aria-label={parts.map((p) => `${p.band.labelTh} ${pc(p.pct)}`).join(', ')}>
+        aria-label={parts.map((p) => `${bandLabel(p.band.key, p.band.labelTh, locale)} ${pc(p.pct)}`).join(', ')}>
         {parts.map((p) => (
           p.pct > 0 && (
             <div
@@ -32,7 +35,7 @@ export function RangeBar({ m, showPercents }: { m: Metrics; showPercents: boolea
               // 1.4% of the day below 54 mg/dL is the most important 1.4% on screen.
               style={{ width: `${p.pct}%`, background: p.band.fill, minWidth: p.pct > 0 ? '3px' : 0 }}
               className="grid place-items-center"
-              title={`${p.band.labelTh} · ${pc(p.pct)}`}
+              title={`${bandLabel(p.band.key, p.band.labelTh, locale)} · ${pc(p.pct)}`}
             >
               {p.pct >= 7 && showPercents && (
                 <span className="num px-1 text-[0.7rem] font-semibold text-accent-ink/95">{barLabel(p.pct)}</span>
@@ -45,13 +48,13 @@ export function RangeBar({ m, showPercents }: { m: Metrics; showPercents: boolea
         {parts.map((p) => (
           <li key={p.band.key} className="flex items-baseline gap-2">
             <span className="mt-[3px] h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: p.band.fill }} />
-            <span className="text-ink-70">{p.band.labelTh}</span>
+            <span className="text-ink-70">{bandLabel(p.band.key, p.band.labelTh, locale)}</span>
             <span className="num ml-auto font-semibold" style={{ color: p.band.ink }}>
               {showPercents ? pc(p.pct) : '—'}
             </span>
             {showPercents && p.pct > 0 && (
               <span className="num hidden w-[4.6rem] shrink-0 text-right text-[0.76rem] text-ink-40 min-[380px]:inline">
-                {fmtDuration(pctToMinutesPerDay(p.pct))}/วัน
+                {fmtDuration(pctToMinutesPerDay(p.pct), locale)}{t('/วัน', ' a day')}
               </span>
             )}
           </li>
@@ -97,11 +100,13 @@ export function MetricCard({ label, value, sub, icon, tone = 'plain', note }: Ca
 }
 
 export function MetricGrid({ w }: { w: WindowSummaryWire }) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const m = w.metrics;
   if (!m) {
     return (
       <p className="glass rounded-md p-5 text-[0.9rem] text-ink-70">
-        ช่วงเวลานี้ไม่มีข้อมูลที่ใช้คำนวณได้ — ลองเลือกช่วงที่กว้างขึ้น
+        {t('ช่วงเวลานี้ไม่มีข้อมูลที่ใช้คำนวณได้ — ลองเลือกช่วงที่กว้างขึ้น', 'No usable data in this window — try a wider one.')}
       </p>
     );
   }
@@ -110,59 +115,59 @@ export function MetricGrid({ w }: { w: WindowSummaryWire }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <MetricCard
-        label="อยู่ในช่วงเป้าหมาย"
+        label={t('อยู่ในช่วงเป้าหมาย', 'In target')}
         value={g.showRangePercents ? pc(m.tir70_180) : '—'}
-        sub="70–180 มก./ดล. · เกณฑ์สากล ≥ 70%"
+        sub={t('70–180 มก./ดล. · เกณฑ์สากล ≥ 70%', '70–180 mg/dL · consensus goal 70% or more')}
         icon={<IconTarget className="h-4 w-4" />}
         tone={g.showRangePercents ? (m.tir70_180 >= 70 ? 'in' : 'high') : 'plain'}
       />
       <MetricCard
-        label="ช่วงเหมาะสม"
+        label={t('ช่วงเหมาะสม', 'Tight range')}
         value={g.showRangePercents ? pc(m.titr70_140) : '—'}
-        sub="70–140 มก./ดล. · ยังไม่มีเกณฑ์สากล ใช้เทียบกับตัวเอง"
+        sub={t('70–140 มก./ดล. · ยังไม่มีเกณฑ์สากล ใช้เทียบกับตัวเอง', '70–140 mg/dL · no consensus goal — compare against yourself')}
         icon={<IconEyeish />}
-        note="ช่วง 70–140 เป็นเกณฑ์ที่ทีม UP Wellness ใช้เทียบผลข้ามสัปดาห์ ไม่ใช่มาตรฐานสากล"
+        note={t('ช่วง 70–140 เป็นเกณฑ์ที่ทีม UP Wellness ใช้เทียบผลข้ามสัปดาห์ ไม่ใช่มาตรฐานสากล', 'The 70–140 band is one the UP Wellness team uses to compare week to week. It is not an international standard.')}
       />
       <MetricCard
-        label="ค่าเฉลี่ย"
+        label={t('ค่าเฉลี่ย', 'Average')}
         value={`${Math.round(m.mean)}`}
-        sub="มก./ดล."
+        sub={t('มก./ดล.', 'mg/dL')}
         icon={<IconAverage className="h-4 w-4" />}
       />
       <MetricCard
-        label="ความแกว่ง (CV)"
+        label={t('ความแกว่ง (CV)', 'Variability (CV)')}
         value={g.showCv ? pc(m.cv) : '—'}
-        sub={g.showCv ? 'เกณฑ์ ≤ 36% ถือว่านิ่ง' : 'ช่วงเวลาสั้นเกินกว่าจะคิด'}
+        sub={g.showCv ? t('เกณฑ์ ≤ 36% ถือว่านิ่ง', '36% or below counts as steady') : t('ช่วงเวลาสั้นเกินกว่าจะคิด', 'Window too short to compute')}
         icon={<IconWave className="h-4 w-4" />}
         tone={g.showCv ? (m.cv <= 36 ? 'in' : 'high') : 'plain'}
       />
       <MetricCard
-        label="ต่ำกว่า 70"
+        label={t('ต่ำกว่า 70', 'Below 70')}
         value={g.showRangePercents ? pc(m.tbrUnder70) : '—'}
-        sub={g.showRangePercents ? `เกณฑ์ ≤ 4% · ต่ำกว่า 54 = ${pc(m.tbrUnder54)}` : undefined}
+        sub={g.showRangePercents ? t(`เกณฑ์ ≤ 4% · ต่ำกว่า 54 = ${pc(m.tbrUnder54)}`, `Goal 4% or less · below 54 = ${pc(m.tbrUnder54)}`) : undefined}
         icon={<IconArrowDown className="h-4 w-4" />}
         tone={g.showRangePercents ? (m.tbrUnder70 > 4 || m.tbrUnder54 > 1 ? 'low' : 'in') : 'plain'}
       />
       <MetricCard
-        label="สูงกว่า 180"
+        label={t('สูงกว่า 180', 'Above 180')}
         value={g.showRangePercents ? pc(m.tarOver180) : '—'}
-        sub={g.showRangePercents ? `เกณฑ์ ≤ 25% · สูงกว่า 250 = ${pc(m.tarOver250)}` : undefined}
+        sub={g.showRangePercents ? t(`เกณฑ์ ≤ 25% · สูงกว่า 250 = ${pc(m.tarOver250)}`, `Goal 25% or less · above 250 = ${pc(m.tarOver250)}`) : undefined}
         icon={<IconArrowUp className="h-4 w-4" />}
         tone={g.showRangePercents ? (m.tarOver180 > 25 || m.tarOver250 > 5 ? 'high' : 'in') : 'plain'}
       />
       <MetricCard
-        label="GMI (ประมาณ HbA1c)"
+        label={t('GMI (ประมาณ HbA1c)', 'GMI (estimated HbA1c)')}
         value={g.showGmi && m.gmi != null ? `${m.gmi.toFixed(1)}%` : '—'}
-        sub={g.showGmi && m.gmi != null ? 'ค่าประมาณจากค่าเฉลี่ย ไม่ใช่ผลเลือด' : 'ต้องมีข้อมูลอย่างน้อย 3 วัน'}
+        sub={g.showGmi && m.gmi != null ? t('ค่าประมาณจากค่าเฉลี่ย ไม่ใช่ผลเลือด', 'Estimated from the average, not a blood test') : t('ต้องมีข้อมูลอย่างน้อย 3 วัน', 'Needs at least 3 days of data')}
         icon={<IconLab className="h-4 w-4" />}
-        note="GMI = 3.31 + 0.02392 × ค่าเฉลี่ย (Bergenstal 2018) เป็นค่าประมาณ อาจต่างจาก HbA1c ที่เจาะเลือดได้ราว 0.5%"
+        note={t('GMI = 3.31 + 0.02392 × ค่าเฉลี่ย (Bergenstal 2018) เป็นค่าประมาณ อาจต่างจาก HbA1c ที่เจาะเลือดได้ราว 0.5%', 'GMI = 3.31 + 0.02392 × mean (Bergenstal 2018). It is an estimate and can differ from a lab HbA1c by around 0.5%.')}
       />
       <MetricCard
-        label="กลางคืน (00:00–06:00)"
+        label={t('กลางคืน (00:00–06:00)', 'Overnight (00:00–06:00)')}
         value={m.nightMean != null ? `${Math.round(m.nightMean)}` : '—'}
-        sub={m.nightTbrUnder70 != null ? `ต่ำกว่า 70 = ${pc(m.nightTbrUnder70)} ของช่วงกลางคืน` : 'ไม่มีข้อมูลช่วงกลางคืน'}
+        sub={m.nightTbrUnder70 != null ? t(`ต่ำกว่า 70 = ${pc(m.nightTbrUnder70)} ของช่วงกลางคืน`, `Below 70 for ${pc(m.nightTbrUnder70)} of the night`) : t('ไม่มีข้อมูลช่วงกลางคืน', 'No overnight data')}
         icon={<IconMoon className="h-4 w-4" />}
-        note="ช่วงกลางคืน 00:00–06:00 เป็นช่วงที่ทีมกำหนดเอง ไม่ใช่มาตรฐานสากล"
+        note={t('ช่วงกลางคืน 00:00–06:00 เป็นช่วงที่ทีมกำหนดเอง ไม่ใช่มาตรฐานสากล', 'The 00:00–06:00 night window is one this team defined, not an international standard.')}
       />
     </div>
   );
@@ -178,15 +183,17 @@ function IconEyeish() {
 }
 
 export function SpanStrip({ w, intervalMinutes }: { w: WindowSummaryWire; intervalMinutes: number }) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[0.82rem] text-ink-70">
       <span className="inline-flex items-center gap-1.5">
         <IconClock className="h-3.5 w-3.5 text-ink-40" />
-        <span className="num">{w.days < 1 ? fmtDuration(Math.round(w.days * 1440)) : `${w.days.toFixed(1)} วัน`}</span>
+        <span className="num">{w.days < 1 ? fmtDuration(Math.round(w.days * 1440), locale) : t(`${w.days.toFixed(1)} วัน`, `${w.days.toFixed(1)} days`)}</span>
       </span>
-      <span className="num">{w.n.toLocaleString('th-TH')} ค่า</span>
-      <span className="num">เก็บได้ {w.capturePct.toFixed(0)}%</span>
-      <span className="num">ทุก {intervalMinutes} นาที</span>
+      <span className="num">{w.n.toLocaleString(locale === 'en' ? 'en-US' : 'th-TH')} {t('ค่า', 'readings')}</span>
+      <span className="num">{t(`เก็บได้ ${w.capturePct.toFixed(0)}%`, `${w.capturePct.toFixed(0)}% captured`)}</span>
+      <span className="num">{t(`ทุก ${intervalMinutes} นาที`, `every ${intervalMinutes} min`)}</span>
     </div>
   );
 }

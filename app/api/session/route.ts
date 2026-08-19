@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { asLocale, tx } from '@/server/cgm/i18n';
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession, verifyPasscode } from '@/server/auth/session';
 import { clientKey, rateLimit } from '@/server/rate-limit';
 
@@ -9,11 +10,12 @@ const LIMIT = 8;
 const WINDOW = 600;
 
 export async function POST(req: Request) {
+  const t = tx(asLocale(req.headers.get('x-upcgm-locale')));
   const key = clientKey(req.headers);
   const verdict = rateLimit(`gate:${key}`, LIMIT, WINDOW);
   if (!verdict.allowed) {
     return NextResponse.json(
-      { error: 'too-many', messageTh: `ลองผิดหลายครั้งเกินไป รอ ${verdict.retryAfterSeconds} วินาทีแล้วลองอีกครั้ง` },
+      { error: 'too-many', messageTh: t(`ลองผิดหลายครั้งเกินไป รอ ${verdict.retryAfterSeconds} วินาทีแล้วลองอีกครั้ง`, `Too many attempts — wait ${verdict.retryAfterSeconds} seconds and try again.`) },
       { status: 429, headers: { 'Retry-After': String(verdict.retryAfterSeconds) } },
     );
   }
@@ -23,10 +25,10 @@ export async function POST(req: Request) {
     const body = (await req.json()) as { passcode?: unknown };
     if (typeof body.passcode === 'string') passcode = body.passcode;
   } catch {
-    return NextResponse.json({ error: 'bad-request', messageTh: 'คำขอไม่ถูกต้อง' }, { status: 400 });
+    return NextResponse.json({ error: 'bad-request', messageTh: t('คำขอไม่ถูกต้อง', 'Malformed request.') }, { status: 400 });
   }
   if (!passcode || passcode.length > 128) {
-    return NextResponse.json({ error: 'bad-request', messageTh: 'กรุณากรอกรหัสเข้าใช้งาน' }, { status: 400 });
+    return NextResponse.json({ error: 'bad-request', messageTh: t('กรุณากรอกรหัสเข้าใช้งาน', 'Enter the access code.') }, { status: 400 });
   }
 
   const result = verifyPasscode(passcode);
@@ -35,10 +37,10 @@ export async function POST(req: Request) {
     // letting a coach retype a correct code twenty times.
     const messageTh =
       result.reason === 'no-config'
-        ? 'ระบบยังไม่ได้ตั้งรหัสเข้าใช้งาน — แจ้งผู้ดูแลระบบ'
+        ? t('ระบบยังไม่ได้ตั้งรหัสเข้าใช้งาน — แจ้งผู้ดูแลระบบ', 'No access code is configured — tell the administrator.')
         : result.reason === 'expired'
-          ? 'รหัสนี้หมดอายุแล้ว ขอรหัสใหม่จากผู้ดูแลระบบ'
-          : 'รหัสไม่ถูกต้อง';
+          ? t('รหัสนี้หมดอายุแล้ว ขอรหัสใหม่จากผู้ดูแลระบบ', 'This code has expired — ask the administrator for a new one.')
+          : t('รหัสไม่ถูกต้อง', 'Incorrect code.');
     return NextResponse.json({ error: result.reason, messageTh }, { status: result.reason === 'no-config' ? 500 : 401 });
   }
 
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
   try {
     token = signSession(result.label!);
   } catch {
-    return NextResponse.json({ error: 'no-secret', messageTh: 'ระบบยังตั้งค่าไม่ครบ — แจ้งผู้ดูแลระบบ' }, { status: 500 });
+    return NextResponse.json({ error: 'no-secret', messageTh: t('ระบบยังตั้งค่าไม่ครบ — แจ้งผู้ดูแลระบบ', 'The server is not fully configured — tell the administrator.') }, { status: 500 });
   }
 
   const res = NextResponse.json({ ok: true, label: result.label });

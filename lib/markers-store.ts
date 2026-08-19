@@ -1,4 +1,5 @@
 import type { MealMarker } from './types';
+import type { T } from './i18n';
 
 /**
  * Meal markers live in the coach's own browser and nowhere else. No account, no
@@ -105,20 +106,24 @@ export interface ImportResult {
   errorTh?: string;
 }
 
-export function fromFile(text: string, currentDatasetId: string): ImportResult {
+export function fromFile(
+  text: string,
+  currentDatasetId: string,
+  t: T = (th) => th,
+): ImportResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, markers: [], errorTh: 'ไฟล์นี้อ่านไม่ออก — ต้องเป็นไฟล์ .json ที่กด “บันทึกมื้ออาหารเป็นไฟล์” ไว้' };
+    return { ok: false, markers: [], errorTh: t('ไฟล์นี้อ่านไม่ออก — ต้องเป็นไฟล์ .json ที่กด “บันทึกมื้ออาหารเป็นไฟล์” ไว้', 'This file cannot be read — it must be a .json saved with “Save meals to file”.') };
   }
   const obj = parsed as Partial<MarkerFile>;
   if (obj?.format !== 'upcgm-markers') {
-    return { ok: false, markers: [], errorTh: 'ไฟล์นี้ไม่ใช่ไฟล์มื้ออาหารของเครื่องมือนี้' };
+    return { ok: false, markers: [], errorTh: t('ไฟล์นี้ไม่ใช่ไฟล์มื้ออาหารของเครื่องมือนี้', 'This is not a meal file from this tool.') };
   }
   const markers = sanitise(obj.markers);
   if (markers.length === 0) {
-    return { ok: false, markers: [], errorTh: 'ไฟล์นี้ไม่มีมื้ออาหารที่ใช้ได้' };
+    return { ok: false, markers: [], errorTh: t('ไฟล์นี้ไม่มีมื้ออาหารที่ใช้ได้', 'This file holds no usable meals.') };
   }
   if (obj.datasetId && obj.datasetId !== currentDatasetId) {
     // Loading anyway is a legitimate choice — same person, re-exported file — so

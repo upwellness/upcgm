@@ -1,4 +1,5 @@
 import { minuteOfDay, pctToMinutesPerDay, startOfDay } from '@/lib/time';
+import { tx, type Locale } from './i18n';
 import { mealResponse } from '@/lib/meal-response';
 import type { AgpBin, DailyProfile, LowEvent, Metrics, RangeBucket, Reading } from '@/lib/types';
 import { isMetricGrade } from './qc';
@@ -38,7 +39,8 @@ export function quantile(sorted: number[], p: number): number | null {
 
 const pct = (count: number, total: number) => (total === 0 ? 0 : (count / total) * 100);
 
-export function computeMetrics(all: Reading[]): Metrics | null {
+export function computeMetrics(all: Reading[], locale: Locale = 'th'): Metrics | null {
+  const t = tx(locale);
   const rs = all.filter(isMetricGrade);
   if (rs.length === 0) return null;
 
@@ -81,11 +83,11 @@ export function computeMetrics(all: Reading[]): Metrics | null {
   const nightValues = night.map((r) => r.v);
 
   const buckets: RangeBucket[] = [
-    { key: 'tbr54', labelTh: 'ต่ำมาก (ต่ำกว่า 54)', pct: tbrUnder54, minutesPerDay: pctToMinutesPerDay(tbrUnder54) },
-    { key: 'tbr70', labelTh: 'ต่ำ (54–69)', pct: pct(counts.tbr70, n), minutesPerDay: pctToMinutesPerDay(pct(counts.tbr70, n)) },
-    { key: 'tir', labelTh: 'อยู่ในเป้าหมาย (70–180)', pct: tir, minutesPerDay: pctToMinutesPerDay(tir) },
-    { key: 'tar180', labelTh: 'สูง (181–250)', pct: tar180to250, minutesPerDay: pctToMinutesPerDay(tar180to250) },
-    { key: 'tar250', labelTh: 'สูงมาก (มากกว่า 250)', pct: tarOver250, minutesPerDay: pctToMinutesPerDay(tarOver250) },
+    { key: 'tbr54', labelTh: t('ต่ำมาก (ต่ำกว่า 54)', 'Very low (below 54)'), pct: tbrUnder54, minutesPerDay: pctToMinutesPerDay(tbrUnder54) },
+    { key: 'tbr70', labelTh: t('ต่ำ (54–69)', 'Low (54–69)'), pct: pct(counts.tbr70, n), minutesPerDay: pctToMinutesPerDay(pct(counts.tbr70, n)) },
+    { key: 'tir', labelTh: t('อยู่ในเป้าหมาย (70–180)', 'In target (70–180)'), pct: tir, minutesPerDay: pctToMinutesPerDay(tir) },
+    { key: 'tar180', labelTh: t('สูง (181–250)', 'High (181–250)'), pct: tar180to250, minutesPerDay: pctToMinutesPerDay(tar180to250) },
+    { key: 'tar250', labelTh: t('สูงมาก (มากกว่า 250)', 'Very high (above 250)'), pct: tarOver250, minutesPerDay: pctToMinutesPerDay(tarOver250) },
   ];
 
   return {

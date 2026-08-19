@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useT } from './PrefsProvider';
 import { GRID_LINES, PATTERN_STYLE, Y_MAX, Y_MIN, type PatternKey } from '@/lib/bands';
 import { useElementWidth } from '@/lib/use-width';
 import type { AgpBin } from '@/lib/types';
@@ -27,6 +28,7 @@ export interface AgpNoteView {
 export default function AgpChart({
   bins, height = 250, notes = [], staticMode = false,
 }: { bins: AgpBin[]; height?: number; notes?: AgpNoteView[]; staticMode?: boolean }) {
+  const t = useT();
   const [wrapRef, measured] = useElementWidth<HTMLDivElement>(900);
   const [open, setOpen] = useState<number | null>(null);
   const W = Math.max(320, measured);
@@ -38,7 +40,7 @@ export default function AgpChart({
   if (usable.length < 4) {
     return (
       <p className="glass rounded-md p-5 text-[0.9rem] text-ink-70">
-        ต้องมีข้อมูลอย่างน้อย 7 วันจึงจะรวมเป็นภาพวันปกติได้
+        {t('ต้องมีข้อมูลอย่างน้อย 7 วันจึงจะรวมเป็นภาพวันปกติได้', 'At least 7 days are needed before the days can be combined into a typical day.')}
       </p>
     );
   }
@@ -76,7 +78,7 @@ export default function AgpChart({
   return (
     <div ref={wrapRef} className="relative w-full">
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto', display: 'block' }} role="img"
-      aria-label="ภาพรวมวันปกติ แสดงช่วงกระจายของน้ำตาลตามเวลาในแต่ละวัน">
+      aria-label={t('ภาพรวมวันปกติ แสดงช่วงกระจายของน้ำตาลตามเวลาในแต่ละวัน', 'A typical day: how glucose spreads across the hours')}>
       <rect x={PAD.left} y={y(180)} width={plotW} height={Math.max(0, y(70) - y(180))} fill="rgba(62,142,90,.08)" />
 
       {GRID_LINES.map((g) => (

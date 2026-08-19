@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useT } from './PrefsProvider';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import A4Sheet from './A4Sheet';
 import type { PatternSnapshotView } from './PatternPanel';
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function ExportDialog(props: Props) {
+  const t = useT();
   const { open, onClose } = props;
   const sheetRef = useRef<HTMLDivElement>(null);
   const [clientName, setClientName] = useState('');
@@ -90,7 +92,7 @@ export default function ExportDialog(props: Props) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     } catch {
-      setError('บันทึกรูปไม่สำเร็จบนเบราว์เซอร์นี้ — กด “สั่งพิมพ์” แล้วเลือกบันทึกเป็น PDF ได้เหมือนกัน');
+      setError(t('บันทึกรูปไม่สำเร็จบนเบราว์เซอร์นี้ — กด “สั่งพิมพ์” แล้วเลือกบันทึกเป็น PDF ได้เหมือนกัน', 'Saving an image did not work in this browser — use “Print” and choose Save as PDF instead.'));
     } finally {
       if (holder) holder.style.transform = previousTransform;
       setBusy(false);
@@ -101,39 +103,39 @@ export default function ExportDialog(props: Props) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/45 p-3 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true"
-      aria-label="สร้างรายงานหนึ่งหน้าให้เคส">
+      aria-label={t('สร้างรายงานหนึ่งหน้าให้เคส', 'Build a one-page report for the client')}>
       <div className="mx-auto max-w-5xl">
         <div className="glass no-print sticky top-0 z-10 mb-4 flex flex-wrap items-end gap-3 rounded-lg p-4 shadow-lg">
           <label className="min-w-[10rem] flex-1">
-            <span className="text-[0.8rem] font-medium">ชื่อเรียกของเคส (ไม่จำเป็น)</span>
+            <span className="text-[0.8rem] font-medium">{t('ชื่อเรียกของเคส (ไม่จำเป็น)', 'What to call the client (optional)')}</span>
             <input value={clientName} onChange={(e) => setClientName(e.target.value)} maxLength={40}
-              placeholder="เช่น พี่แดง"
+              placeholder={t('เช่น พี่แดง', 'e.g. Dang')}
               className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
           </label>
           <label className="min-w-[14rem] flex-[2]">
-            <span className="text-[0.8rem] font-medium">บันทึกจากโค้ช (ไม่จำเป็น)</span>
+            <span className="text-[0.8rem] font-medium">{t('บันทึกจากโค้ช (ไม่จำเป็น)', 'Note from the coach (optional)')}</span>
             <input value={coachNote} onChange={(e) => setCoachNote(e.target.value)} maxLength={200}
-              placeholder="เช่น อาทิตย์หน้าลองเดินหลังมื้อเย็น 15 นาที แล้วส่งไฟล์ใหม่มาดูกัน"
+              placeholder={t('เช่น อาทิตย์หน้าลองเดินหลังมื้อเย็น 15 นาที แล้วส่งไฟล์ใหม่มาดูกัน', 'e.g. next week, try a 15-minute walk after dinner and send a fresh file')}
               className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
           </label>
           <div className="flex w-full gap-2 sm:w-auto">
             <button onClick={savePng} disabled={busy}
               className="inline-flex min-h-[2.9rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent px-4 py-2.5 text-[0.88rem] font-medium text-accent-ink transition hover:bg-accent-dark disabled:opacity-50 sm:flex-none">
               <IconImage className="h-4 w-4" />
-              {busy ? 'กำลังสร้างรูป…' : 'บันทึกเป็นรูป'}
+              {busy ? t('กำลังสร้างรูป…', 'Building the image…') : t('บันทึกเป็นรูป', 'Save as image')}
             </button>
             <button onClick={() => window.print()}
               className="min-h-[2.9rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-surface-raised">
-              สั่งพิมพ์
+              {t('สั่งพิมพ์', 'Print')}
             </button>
             <button onClick={onClose}
               className="min-h-[2.9rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-surface-raised">
-              ปิด
+              {t('ปิด', 'Close')}
             </button>
           </div>
           {error && <p role="alert" className="w-full text-[0.85rem] text-zone-vhigh-ink">{error}</p>}
           <p className="w-full text-[0.78rem] leading-relaxed text-ink-40">
-            รายงานหน้านี้ไม่มีชื่อสินค้าและไม่มีราคา — ออกแบบให้เคสเอาไปคุยกับแพทย์ได้
+            {t('รายงานหน้านี้ไม่มีชื่อสินค้าและไม่มีราคา — ออกแบบให้เคสเอาไปคุยกับแพทย์ได้', 'This page carries no product names and no prices — it is built for the client to take to a doctor.')}
           </p>
         </div>
 

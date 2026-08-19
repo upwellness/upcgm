@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { tx, type Locale, type T } from './i18n';
 import { coerceTime } from '@/lib/time';
 import type { Reading, RejectedRow } from '@/lib/types';
 import { DEVICE_CEILING } from './thresholds';
@@ -78,11 +79,11 @@ function coerceGlucose(cell: unknown, unit: 'mg/dL' | 'mmol/L'): number | null {
 }
 
 /** A workbook is a zip; anything else is a mislabelled file. */
-function assertLooksLikeWorkbook(buf: Buffer, name: string) {
+function assertLooksLikeWorkbook(buf: Buffer, name: string, tr: T) {
   const isZip = buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b;
   const looksCsv = /\.csv$/i.test(name);
   if (!isZip && !looksCsv) {
-    throw new ParseError(422, 'ไฟล์นี้ไม่ใช่ไฟล์ Excel หรือ CSV — กรุณาส่งออกไฟล์จากแอปเครื่องวัดใหม่แล้วลองอีกครั้ง');
+    throw new ParseError(422, tr('ไฟล์นี้ไม่ใช่ไฟล์ Excel หรือ CSV — กรุณาส่งออกไฟล์จากแอปเครื่องวัดใหม่แล้วลองอีกครั้ง', 'This is not an Excel or CSV file — export it again from the sensor app and try once more.'));
   }
 }
 
@@ -96,11 +97,12 @@ export interface ParseOutput {
   sheetName: string;
 }
 
-export function parseWorkbook(buf: Buffer, sourceName = 'upload'): ParseOutput {
+export function parseWorkbook(buf: Buffer, sourceName = 'upload', locale: Locale = 'th'): ParseOutput {
+  const tr = tx(locale);
   if (buf.byteLength > MAX_BYTES) {
-    throw new ParseError(413, `ไฟล์ใหญ่เกินที่รับได้ (สูงสุด ${MAX_BYTES / 1024 / 1024} MB) — ลองส่งออกเฉพาะช่วงล่าสุด`);
+    throw new ParseError(413, tr(`ไฟล์ใหญ่เกินที่รับได้ (สูงสุด ${MAX_BYTES / 1024 / 1024} MB) — ลองส่งออกเฉพาะช่วงล่าสุด`, `File is larger than the ${MAX_BYTES / 1024 / 1024} MB limit — try exporting just the most recent stretch.`));
   }
-  assertLooksLikeWorkbook(buf, sourceName);
+  assertLooksLikeWorkbook(buf, sourceName, tr);
 
   let wb: XLSX.WorkBook;
   try {
@@ -108,7 +110,7 @@ export function parseWorkbook(buf: Buffer, sourceName = 'upload'): ParseOutput {
     // to read it, rather than letting the reader guess a timezone for us.
     wb = XLSX.read(buf, { type: 'buffer', cellDates: false, raw: true, dense: true });
   } catch {
-    throw new ParseError(422, 'เปิดไฟล์ไม่สำเร็จ ไฟล์อาจเสียหาย — ลองส่งออกจากแอปเครื่องวัดใหม่');
+    throw new ParseError(422, tr('เปิดไฟล์ไม่สำเร็จ ไฟล์อาจเสียหาย — ลองส่งออกจากแอปเครื่องวัดใหม่', 'The file would not open and may be damaged — try exporting it from the sensor app again.'));
   }
 
   // Do not trust '!ref' or a dimension record: 9 of 13 real Ottai files have
@@ -126,13 +128,13 @@ export function parseWorkbook(buf: Buffer, sourceName = 'upload'): ParseOutput {
   if (!rows || !header) {
     throw new ParseError(
       422,
-      'หาคอลัมน์เวลาและค่าน้ำตาลในไฟล์นี้ไม่พบ — ไฟล์ต้องมีคอลัมน์เวลา (เช่น Time) และคอลัมน์ค่าน้ำตาล (เช่น Glucose mg/dL)',
+      tr('หาคอลัมน์เวลาและค่าน้ำตาลในไฟล์นี้ไม่พบ — ไฟล์ต้องมีคอลัมน์เวลา (เช่น Time) และคอลัมน์ค่าน้ำตาล (เช่น Glucose mg/dL)', 'No time and glucose columns found — the file needs a time column (e.g. Time) and a glucose column (e.g. Glucose mg/dL).'),
     );
   }
 
   const dataRows = rows.length - header.rowIdx - 1;
   if (dataRows > MAX_ROWS) {
-    throw new ParseError(413, `จำนวนแถวเกินที่รองรับ (${MAX_ROWS.toLocaleString('th-TH')} แถว) — ลองแบ่งไฟล์เป็นช่วงสั้นลง`);
+    throw new ParseError(413, tr(`จำนวนแถวเกินที่รองรับ (${MAX_ROWS.toLocaleString('th-TH')} แถว) — ลองแบ่งไฟล์เป็นช่วงสั้นลง`, `More rows than this tool takes (${MAX_ROWS.toLocaleString('en-US')} max) — try splitting the file into shorter stretches.`));
   }
 
   const parsed: Reading[] = [];
@@ -144,17 +146,17 @@ export function parseWorkbook(buf: Buffer, sourceName = 'upload'): ParseOutput {
     const rawV = row[header.glucoseCol];
     if (rawT == null && rawV == null) continue; // blank filler row
     const t = coerceTime(rawT);
-    if (t == null) { rejected.push({ row: i + 1, reason: 'อ่านเวลาไม่ได้' }); continue; }
+    if (t == null) { rejected.push({ row: i + 1, reason: tr('อ่านเวลาไม่ได้', 'could not read the time') }); continue; }
     const v = coerceGlucose(rawV, header.unit);
-    if (v == null) { rejected.push({ row: i + 1, reason: 'อ่านค่าน้ำตาลไม่ได้' }); continue; }
+    if (v == null) { rejected.push({ row: i + 1, reason: tr('อ่านค่าน้ำตาลไม่ได้', 'could not read the glucose value') }); continue; }
     parsed.push({ t, v, flag: 'ok' });
   }
 
   if (parsed.length === 0) {
-    throw new ParseError(422, 'ไม่พบข้อมูลน้ำตาลที่อ่านได้ในไฟล์นี้');
+    throw new ParseError(422, tr('ไม่พบข้อมูลน้ำตาลที่อ่านได้ในไฟล์นี้', 'No readable glucose data in this file.'));
   }
   if (parsed.length < MIN_READINGS) {
-    throw new ParseError(422, `มีข้อมูลเพียง ${parsed.length} ค่า — น้อยเกินกว่าจะสรุปอะไรได้ (ต้องมีอย่างน้อย ${MIN_READINGS} ค่า)`);
+    throw new ParseError(422, tr(`มีข้อมูลเพียง ${parsed.length} ค่า — น้อยเกินกว่าจะสรุปอะไรได้ (ต้องมีอย่างน้อย ${MIN_READINGS} ค่า)`, `Only ${parsed.length} readings — too few to conclude anything (at least ${MIN_READINGS} are needed).`));
   }
 
   // The Ottai export is newest-first. Sorting has to happen before anything

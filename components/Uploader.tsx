@@ -1,10 +1,13 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { usePrefs, useT } from './PrefsProvider';
 import type { AnalysisResult } from '@/lib/types';
 import { IconAlert, IconUpload } from './Icons';
 
 export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) => void }) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -17,21 +20,24 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
     try {
       const form = new FormData();
       form.append('file', file);
+      // The parser and every window label are built server-side, so the
+      // reader's language has to travel with the file.
+      form.append('locale', locale);
       const res = await fetch('/api/analyse', { method: 'POST', body: form });
       if (res.status === 401) {
         // Only reachable if the passcode gate is switched back on in
         // middleware.ts and the session expired while the tab sat open.
-        setError('เซสชันหมดอายุ — โหลดหน้านี้ใหม่อีกครั้ง');
+        setError(t('เซสชันหมดอายุ — โหลดหน้านี้ใหม่อีกครั้ง', 'Session expired — reload this page.'));
         return;
       }
       const json = (await res.json().catch(() => ({}))) as Partial<AnalysisResult> & { messageTh?: string };
       if (!res.ok) {
-        setError(json.messageTh ?? 'อ่านไฟล์ไม่สำเร็จ');
+        setError(json.messageTh ?? t('อ่านไฟล์ไม่สำเร็จ', 'Could not read the file.'));
         return;
       }
       onResult(json as AnalysisResult);
     } catch {
-      setError('ส่งไฟล์ไม่สำเร็จ ลองตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง');
+      setError(t('ส่งไฟล์ไม่สำเร็จ ลองตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง', 'Upload failed — check the connection and try again.'));
     } finally {
       setBusy(false);
     }
@@ -42,7 +48,7 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
       <div className="mb-7 text-center">
         <h1 className="font-head text-[1.5rem] font-semibold tracking-tight sm:text-[1.75rem]">CGM Analyser</h1>
         <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-70">
-          ส่งไฟล์ที่ดาวน์โหลดจากแอปเครื่องวัดน้ำตาลต่อเนื่องเข้ามา แล้วอ่านผลไปคุยกับเคสได้เลย
+          {t('ส่งไฟล์ที่ดาวน์โหลดจากแอปเครื่องวัดน้ำตาลต่อเนื่องเข้ามา แล้วอ่านผลไปคุยกับเคสได้เลย', 'Send in the file downloaded from the CGM app and read the results straight into the conversation.')}
         </p>
       </div>
 
@@ -65,11 +71,11 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
           disabled={busy}
           className="w-full rounded-sm bg-accent px-5 py-3.5 font-head text-[1rem] font-medium text-accent-ink shadow-sm transition hover:bg-accent-dark disabled:opacity-50 sm:w-auto"
         >
-          {busy ? 'กำลังอ่านไฟล์…' : 'เลือกไฟล์จากเครื่อง'}
+          {busy ? t('กำลังอ่านไฟล์…', 'Reading the file…') : t('เลือกไฟล์จากเครื่อง', 'Choose a file')}
         </button>
         <p className="mt-3 text-[0.85rem] text-ink-40">
-          รับไฟล์ .xlsx และ .csv ขนาดไม่เกิน 5 MB
-          <span className="hidden sm:inline"> · ลากไฟล์มาวางที่นี่ก็ได้</span>
+          {t('รับไฟล์ .xlsx และ .csv ขนาดไม่เกิน 5 MB', 'Accepts .xlsx and .csv up to 5 MB')}
+          <span className="hidden sm:inline">{t(' · ลากไฟล์มาวางที่นี่ก็ได้', ' · you can also drop a file here')}</span>
         </p>
         <input
           ref={inputRef}
@@ -92,10 +98,12 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
       )}
 
       <div className="mt-7 rounded-md border border-line bg-surface-raised/50 p-4 text-[0.85rem] leading-relaxed text-ink-70">
-        <p className="font-medium text-ink">ไฟล์ไปไหน</p>
+        <p className="font-medium text-ink">{t('ไฟล์ไปไหน', 'Where does the file go?')}</p>
         <p className="mt-1.5">
-          ไฟล์ถูกอ่านในเซิร์ฟเวอร์แล้วส่งผลกลับมาทันที ไม่มีการเก็บไฟล์หรือข้อมูลน้ำตาลไว้ในระบบ
-          มื้ออาหารที่โค้ชบันทึกเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น
+          {t(
+            'ไฟล์ถูกอ่านในเซิร์ฟเวอร์แล้วส่งผลกลับมาทันที ไม่มีการเก็บไฟล์หรือข้อมูลน้ำตาลไว้ในระบบ มื้ออาหารที่โค้ชบันทึกเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น',
+            'The file is read on the server and the result comes straight back. Neither the file nor any glucose data is kept. Meals the coach logs stay in this browser only.',
+          )}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { asLocale, tx } from '@/server/cgm/i18n';
 import { clientKey, rateLimit } from '@/server/rate-limit';
 
 export const runtime = 'nodejs';
@@ -12,10 +13,11 @@ export const runtime = 'nodejs';
  * is used for the one call and never stored.
  */
 export async function POST(req: Request) {
+  const t = tx(asLocale(req.headers.get('x-upcgm-locale')));
   const verdict = rateLimit(`models:${clientKey(req.headers)}`, 20, 3600);
   if (!verdict.allowed) {
     return NextResponse.json(
-      { ok: false, errorTh: `ลองบ่อยเกินไป รออีก ${Math.ceil(verdict.retryAfterSeconds / 60)} นาที` },
+      { ok: false, errorTh: t(`ลองบ่อยเกินไป รออีก ${Math.ceil(verdict.retryAfterSeconds / 60)} นาที`, `Too many attempts — wait ${Math.ceil(verdict.retryAfterSeconds / 60)} minutes.`) },
       { status: 429 },
     );
   }
@@ -24,10 +26,10 @@ export async function POST(req: Request) {
   try {
     ({ apiKey } = (await req.json()) as { apiKey?: string } as { apiKey: string });
   } catch {
-    return NextResponse.json({ ok: false, errorTh: 'คำขอไม่ถูกต้อง' }, { status: 400 });
+    return NextResponse.json({ ok: false, errorTh: t('คำขอไม่ถูกต้อง', 'Malformed request.') }, { status: 400 });
   }
   if (!apiKey || apiKey.trim().length < 10) {
-    return NextResponse.json({ ok: false, errorTh: 'ยังไม่ได้ใส่ API key' }, { status: 400 });
+    return NextResponse.json({ ok: false, errorTh: t('ยังไม่ได้ใส่ API key', 'No API key provided.') }, { status: 400 });
   }
 
   try {
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
       const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
       return NextResponse.json({
         ok: false,
-        errorTh: `Google ตอบกลับว่า: ${body?.error?.message ?? `HTTP ${res.status}`}`,
+        errorTh: t(`Google ตอบกลับว่า: ${body?.error?.message ?? `HTTP ${res.status}`}`, `Google replied: ${body?.error?.message ?? `HTTP ${res.status}`}`),
       });
     }
 
@@ -68,6 +70,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, models });
   } catch {
-    return NextResponse.json({ ok: false, errorTh: 'ต่อกับ Google ไม่ได้ หรือใช้เวลานานเกินไป' });
+    return NextResponse.json({ ok: false, errorTh: t('ต่อกับ Google ไม่ได้ หรือใช้เวลานานเกินไป', 'Could not reach Google, or it took too long.') });
   }
 }

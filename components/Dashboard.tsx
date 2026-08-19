@@ -16,7 +16,9 @@ import MealPanel, { type MealPatternView } from './MealPanel';
 import { MetricGrid, RangeBar, SpanStrip } from './Metrics';
 import EventExplorer, { type CgmEventView, type EventSnapshotView } from './EventExplorer';
 import PatternPanel, { type PatternSnapshotView } from './PatternPanel';
+import { windowChip, windowLabel } from '@/lib/bands';
 import PrefsMenu from './PrefsMenu';
+import { usePrefs, useT } from './PrefsProvider';
 import Uploader from './Uploader';
 
 interface AiResponse {
@@ -36,6 +38,8 @@ interface AiResponse {
 }
 
 export default function Dashboard() {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [meds, setMeds] = useState<GlucoseLoweringMeds | null>(null);
   const [markers, setMarkers] = useState<MealMarker[]>([]);
@@ -105,7 +109,7 @@ export default function Dashboard() {
     const seq = ++aiSeq.current;
     setAiBusy(true);
     const slice = readings.filter((r) => r.t >= activeWindow.from && r.t <= activeWindow.to);
-    const payload = {
+    const payload = { locale,
       result: { ...result, metrics: activeWindow.metrics ?? result.metrics, quality: { ...result.quality, spanDays: activeWindow.days, capturePct: activeWindow.capturePct }, lowEvents: activeWindow.lowEvents },
       meds,
       markers: markers.filter((m) => m.t >= activeWindow.from && m.t <= activeWindow.to),
@@ -121,14 +125,14 @@ export default function Dashboard() {
         if (seq === aiSeq.current) setAi(json);
       })
       .catch(() => {
-        if (seq === aiSeq.current) setAi({ reasonTh: 'เชื่อมต่อไม่ได้ — ลองเลือกช่วงเวลาใหม่อีกครั้ง' });
+        if (seq === aiSeq.current) setAi({ reasonTh: t('เชื่อมต่อไม่ได้ — ลองเลือกช่วงเวลาใหม่อีกครั้ง', 'Could not connect — pick the window again.') });
       })
       .finally(() => {
         if (seq === aiSeq.current) setAiBusy(false);
       });
     // `slice` is only used for its length in the payload guard below.
     void slice;
-  }, [result, activeWindow, meds, markers, responses, readings, narrativeNonce, aiOn, aiCfg.apiKey, aiCfg.model]);
+  }, [result, activeWindow, meds, markers, responses, readings, narrativeNonce, aiOn, aiCfg.apiKey, aiCfg.model, locale]);
 
   if (!result) {
     return (
@@ -150,7 +154,7 @@ export default function Dashboard() {
         <div className="min-w-0 flex-1">
           <h1 className="font-head text-[1.25rem] font-semibold tracking-tight sm:text-[1.35rem]">CGM Analyser</h1>
           <p className="truncate text-[0.8rem] text-ink-40 sm:text-[0.83rem]">
-            {result.sourceName} · <span className="num">{result.quality.rowsUsed.toLocaleString('th-TH')} ค่า</span>
+            {result.sourceName} · <span className="num">{result.quality.rowsUsed.toLocaleString(locale === 'en' ? 'en-US' : 'th-TH')} {t('ค่า', 'readings')}</span>
             {' · '}
             <span className="num">{fmtThaiDate(result.metrics.firstT)} – {fmtThaiDate(result.metrics.lastT, { year: true })}</span>
           </p>
@@ -165,21 +169,21 @@ export default function Dashboard() {
             disabled={!w || meds == null}
             className="inline-flex items-center gap-1.5 rounded-sm bg-gold px-3.5 py-2.5 text-[0.86rem] font-medium text-ink transition hover:brightness-95 disabled:opacity-40"
           >
-            <IconImage className="h-4 w-4" /> สร้างใบสรุปให้เคส
+            <IconImage className="h-4 w-4" /> {t('สร้างใบสรุปให้เคส', 'Build client handout')}
           </button>
           <button
             onClick={() => { setResult(null); setAi(null); setMeds(null); }}
             className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface-raised/70 px-3.5 py-2.5 text-[0.86rem] transition hover:bg-surface-raised"
           >
-            <IconUpload className="h-4 w-4" /> เปลี่ยนไฟล์
+            <IconUpload className="h-4 w-4" /> {t('เปลี่ยนไฟล์', 'Change file')}
           </button>
           <Link
             href="/config"
-            title={aiOn ? 'ตั้งค่า · เปิดใช้สรุปด้วย AI อยู่' : 'ตั้งค่า · ยังไม่ได้เปิดใช้ AI'}
+            title={aiOn ? t('ตั้งค่า · เปิดใช้สรุปด้วย AI อยู่', 'Settings · AI summary is on') : t('ตั้งค่า · ยังไม่ได้เปิดใช้ AI', 'Settings · AI summary is off')}
             className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface-raised/70 px-3 py-2.5 text-[0.86rem] transition hover:bg-surface-raised"
           >
-            ตั้งค่า
-            {aiOn && <span className="h-1.5 w-1.5 rounded-full bg-zone-in" aria-label="เปิดใช้ AI อยู่" />}
+            {t('ตั้งค่า', 'Settings')}
+            {aiOn && <span className="h-1.5 w-1.5 rounded-full bg-zone-in" aria-label={t('เปิดใช้ AI อยู่', 'AI summary on')} />}
           </Link>
         </div>
       </header>
@@ -187,7 +191,7 @@ export default function Dashboard() {
       {markersRestored > 0 && (
         <p className="mb-4 flex items-start gap-2 rounded-md bg-zone-in/10 px-3.5 py-2.5 text-[0.85rem] text-zone-in-ink">
           <IconInfo className="mt-0.5 h-4 w-4" />
-          พบมื้ออาหาร {markersRestored} รายการที่บันทึกไว้ในเครื่องนี้สำหรับไฟล์ชุดเดียวกัน — ดึงขึ้นมาให้แล้ว
+          {t(`พบมื้ออาหาร ${markersRestored} รายการที่บันทึกไว้ในเครื่องนี้สำหรับไฟล์ชุดเดียวกัน — ดึงขึ้นมาให้แล้ว`, `Found ${markersRestored} meals saved on this device for the same file — restored.`)}
         </p>
       )}
 
@@ -217,7 +221,7 @@ export default function Dashboard() {
 
               <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
                 <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h2 className="font-head text-[1.05rem] font-semibold">{w.labelTh}</h2>
+                  <h2 className="font-head text-[1.05rem] font-semibold">{windowLabel(w.key, w.labelTh, locale)}</h2>
                   <SpanStrip w={w} intervalMinutes={result.quality.intervalMinutes} />
                 </div>
                 <GlucoseChart
@@ -237,21 +241,21 @@ export default function Dashboard() {
 
               {w.metrics && (
                 <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
-                  <h2 className="mb-3 font-head text-[1.05rem] font-semibold">สัดส่วนเวลาในแต่ละช่วง</h2>
+                  <h2 className="mb-3 font-head text-[1.05rem] font-semibold">{t('สัดส่วนเวลาในแต่ละช่วง', 'Share of time in each band')}</h2>
                   <RangeBar m={w.metrics} showPercents={w.gate.showRangePercents} />
                 </section>
               )}
 
               {w.gate.showAgp && w.agp.length > 0 && (
                 <section className="mt-4 glass rounded-lg p-4 shadow-sm sm:p-5">
-                  <h2 className="font-head text-[1.05rem] font-semibold">ภาพวันปกติ</h2>
+                  <h2 className="font-head text-[1.05rem] font-semibold">{t('ภาพวันปกติ', 'A typical day')}</h2>
                   <p className="mb-3 mt-1 text-[0.83rem] leading-relaxed text-ink-40">
-                    เอาทุกวันมาซ้อนกันบนแกน 24 ชั่วโมง — ตอบคำถามว่า “ช่วงไหนของวันที่มักมีปัญหา”
+                    {t('เอาทุกวันมาซ้อนกันบนแกน 24 ชั่วโมง — ตอบคำถามว่า “ช่วงไหนของวันที่มักมีปัญหา”', 'Every day laid over one 24-hour axis — it answers “which part of the day tends to go wrong”.')}
                   </p>
                   <AgpChart bins={w.agp} height={260} notes={interp?.agpNotes ?? []} />
                   {(interp?.agpNotes?.length ?? 0) > 0 && (
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-ink-40">
-                      จุดบนกราฟคือช่วงเวลาที่มีอะไรน่าสังเกต — แตะหรือเอาเมาส์ไปวางเพื่อดูว่าเรื่องอะไร
+                      {t('จุดบนกราฟคือช่วงเวลาที่มีอะไรน่าสังเกต — แตะหรือเอาเมาส์ไปวางเพื่อดูว่าเรื่องอะไร', 'The dots mark hours worth noticing — tap or hover one to see what it is.')}
                     </p>
                   )}
                 </section>
@@ -260,8 +264,8 @@ export default function Dashboard() {
               <section className="mt-5">
                 <div className="mb-3 flex items-center gap-2">
                   <IconSparkle className="h-4 w-4 text-olive" />
-                  <h2 className="font-head text-[1.1rem] font-semibold">สิ่งที่ข้อมูลบอก</h2>
-                  {aiBusy && <span className="text-[0.8rem] text-ink-40">กำลังคำนวณ…</span>}
+                  <h2 className="font-head text-[1.1rem] font-semibold">{t('สิ่งที่ข้อมูลบอก', 'What the data says')}</h2>
+                  {aiBusy && <span className="text-[0.8rem] text-ink-40">{t('กำลังคำนวณ…', 'Working…')}</span>}
                   <div className="ml-auto">
                     {aiOn ? (
                       <button
@@ -270,12 +274,12 @@ export default function Dashboard() {
                         className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-olive/40 bg-surface-raised/70 px-3 py-1.5 text-[0.82rem] font-medium text-olive transition hover:bg-surface-raised disabled:opacity-40"
                       >
                         <IconSparkle className="h-3.5 w-3.5" />
-                        {narrativeNonce > 0 ? 'สรุปใหม่ด้วย AI' : 'สรุปด้วย AI'}
+                        {narrativeNonce > 0 ? t('สรุปใหม่ด้วย AI', 'Summarise again with AI') : t('สรุปด้วย AI', 'Summarise with AI')}
                       </button>
                     ) : (
                       <Link href="/config"
                         className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-line bg-surface-raised/60 px-3 py-1.5 text-[0.8rem] text-ink-40 transition hover:bg-surface-raised">
-                        เปิดใช้สรุปด้วย AI →
+                        {t('เปิดใช้สรุปด้วย AI →', 'Switch on the AI summary →')}
                       </Link>
                     )}
                   </div>
@@ -297,7 +301,7 @@ export default function Dashboard() {
 
                 {interp && interp.limitationsTh.length > 0 && (
                   <div className="mt-4 rounded-md border border-line bg-surface-raised/50 p-4">
-                    <h3 className="text-[0.85rem] font-medium text-ink-70">ข้อจำกัดที่ต้องบอกเคส</h3>
+                    <h3 className="text-[0.85rem] font-medium text-ink-70">{t('ข้อจำกัดที่ต้องบอกเคส', 'Limits to tell the client')}</h3>
                     <ul className="mt-1.5 space-y-1">
                       {interp.limitationsTh.map((l, i) => (
                         <li key={i} className="text-[0.83rem] leading-relaxed text-ink-70">· {l}</li>
@@ -336,11 +340,11 @@ export default function Dashboard() {
                   disabled={meds == null}
                   className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-gold px-3 py-3 text-[0.9rem] font-medium text-ink disabled:opacity-40"
                 >
-                  <IconImage className="h-4 w-4" /> ใบสรุปให้เคส
+                  <IconImage className="h-4 w-4" /> {t('ใบสรุปให้เคส', 'Client handout')}
                 </button>
                 <button
                   onClick={() => { setResult(null); setAi(null); setMeds(null); }}
-                  aria-label="เปลี่ยนไฟล์"
+                  aria-label={t('เปลี่ยนไฟล์', 'Change file')}
                   className="inline-flex items-center justify-center rounded-sm border border-line bg-surface-raised/80 px-4 py-3"
                 >
                   <IconUpload className="h-4 w-4" />
@@ -373,27 +377,28 @@ export default function Dashboard() {
  * an event worth a phone call — and no amount of chart drawing recovers that.
  */
 function MedsQuestion({ onAnswer }: { onAnswer: (m: GlucoseLoweringMeds) => void }) {
+  const t = useT();
   return (
     <section className="glass mx-auto max-w-2xl rounded-lg p-6 shadow-md">
-      <h2 className="font-head text-[1.15rem] font-semibold">ก่อนดูผล — ขอถามข้อเดียว</h2>
+      <h2 className="font-head text-[1.15rem] font-semibold">{t('ก่อนดูผล — ขอถามข้อเดียว', 'One question before the results')}</h2>
       <p className="mt-2 text-[0.92rem] leading-relaxed text-ink-70">
-        เคสใช้ยาหรืออินซูลินที่ทำให้น้ำตาลลดอยู่หรือไม่ (เช่น ยาเบาหวานกลุ่มซัลโฟนิลยูเรีย หรืออินซูลิน)
+        {t('เคสใช้ยาหรืออินซูลินที่ทำให้น้ำตาลลดอยู่หรือไม่ (เช่น ยาเบาหวานกลุ่มซัลโฟนิลยูเรีย หรืออินซูลิน)', 'Does this person take medication or insulin that lowers glucose (a sulfonylurea, for example, or insulin)?')}
       </p>
       <p className="mt-1.5 text-[0.83rem] leading-relaxed text-ink-40">
-        คำตอบนี้เปลี่ยนวิธีอ่านช่วงน้ำตาลต่ำ — ถ้าใช้ยาอยู่ ช่วงต่ำเป็นเรื่องที่ต้องให้แพทย์ดู ไม่ใช่เรื่องที่ปรับด้วยอาหารเอง
+        {t('คำตอบนี้เปลี่ยนวิธีอ่านช่วงน้ำตาลต่ำ — ถ้าใช้ยาอยู่ ช่วงต่ำเป็นเรื่องที่ต้องให้แพทย์ดู ไม่ใช่เรื่องที่ปรับด้วยอาหารเอง', 'The answer changes how lows are read. On medication, a low is one for the doctor, not something to adjust with food.')}
       </p>
       <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
         <button onClick={() => onAnswer('yes')}
           className="min-h-[3rem] rounded-sm bg-accent px-4 py-3 text-[0.92rem] font-medium text-accent-ink transition hover:bg-accent-dark">
-          ใช้อยู่
+          {t('ใช้อยู่', 'Yes')}
         </button>
         <button onClick={() => onAnswer('no')}
           className="min-h-[3rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-3 text-[0.92rem] transition hover:bg-surface-raised">
-          ไม่ใช้
+          {t('ไม่ใช้', 'No')}
         </button>
         <button onClick={() => onAnswer('unknown')}
           className="min-h-[3rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-3 text-[0.92rem] transition hover:bg-surface-raised">
-          ยังไม่ทราบ
+          {t('ยังไม่ทราบ', 'Not known')}
         </button>
       </div>
     </section>
@@ -401,20 +406,22 @@ function MedsQuestion({ onAnswer }: { onAnswer: (m: GlucoseLoweringMeds) => void
 }
 
 function QualityStrip({ result }: { result: AnalysisResult }) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const q = result.quality;
   const artifacts = q.qcNotes.filter((n) => n.kind === 'floor-artifact');
   const items: string[] = [];
-  if (q.unitConverted) items.push(`ไฟล์เป็นหน่วย ${q.unitDetected} — แปลงเป็น มก./ดล. แล้ว`);
-  if (q.duplicatesDropped > 0) items.push(`เวลาซ้ำ ${q.duplicatesDropped} แถว`);
-  if (q.rejected.length > 0) items.push(`อ่านไม่ได้ ${q.rejected.length} แถว`);
-  if (artifacts.length > 0) items.push(`ช่วงที่เซนเซอร์น่าจะหลุด ${artifacts.length} ช่วง — ไม่นับในการคำนวณ`);
-  if (q.gaps.length > 0) items.push(`ช่วงที่ไม่มีข้อมูล ${q.gaps.length} ช่วง`);
+  if (q.unitConverted) items.push(t(`ไฟล์เป็นหน่วย ${q.unitDetected} — แปลงเป็น มก./ดล. แล้ว`, `File used ${q.unitDetected} — converted to mg/dL`));
+  if (q.duplicatesDropped > 0) items.push(t(`เวลาซ้ำ ${q.duplicatesDropped} แถว`, `${q.duplicatesDropped} duplicate timestamps`));
+  if (q.rejected.length > 0) items.push(t(`อ่านไม่ได้ ${q.rejected.length} แถว`, `${q.rejected.length} unreadable rows`));
+  if (artifacts.length > 0) items.push(t(`ช่วงที่เซนเซอร์น่าจะหลุด ${artifacts.length} ช่วง — ไม่นับในการคำนวณ`, `${artifacts.length} likely sensor dropouts — excluded from the calculations`));
+  if (q.gaps.length > 0) items.push(t(`ช่วงที่ไม่มีข้อมูล ${q.gaps.length} ช่วง`, `${q.gaps.length} gaps with no data`));
   if (items.length === 0) return null;
 
   return (
     <details className="glass mt-1 rounded-md px-4 py-3 text-[0.85rem] shadow-sm">
       <summary className="cursor-pointer font-medium text-ink-70">
-        คุณภาพข้อมูล · มี {items.length} เรื่องที่ควรรู้
+        {t(`คุณภาพข้อมูล · มี ${items.length} เรื่องที่ควรรู้`, `Data quality · ${items.length} things worth knowing`)}
       </summary>
       <ul className="mt-2 space-y-1 text-ink-70">
         {items.map((s, i) => <li key={i} className="num">· {s}</li>)}
@@ -433,6 +440,8 @@ function RangePicker({
   onPreset: (key: string) => void;
   onCustom: (from: number, to: number) => void;
 }) {
+  const tr = useT();
+  const { prefs: { locale } } = usePrefs();
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(() => toLocalInputValue(bounds.to - 1440));
   const [to, setTo] = useState(() => toLocalInputValue(bounds.to));
@@ -441,10 +450,10 @@ function RangePicker({
   function apply() {
     const f = fromLocalInputValue(from);
     const t = fromLocalInputValue(to);
-    if (f == null || t == null) { setErr('กรอกวันเวลาให้ครบก่อน'); return; }
-    if (t <= f) { setErr('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม'); return; }
+    if (f == null || t == null) { setErr(tr('กรอกวันเวลาให้ครบก่อน', 'Fill in both dates first.')); return; }
+    if (t <= f) { setErr(tr('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม', 'The end must come after the start.')); return; }
     if (t < bounds.from || f > bounds.to) {
-      setErr(`ช่วงนี้อยู่นอกไฟล์ — ไฟล์มีข้อมูล ${fmtDateTime(bounds.from)} ถึง ${fmtDateTime(bounds.to)}`);
+      setErr(tr(`ช่วงนี้อยู่นอกไฟล์ — ไฟล์มีข้อมูล ${fmtDateTime(bounds.from)} ถึง ${fmtDateTime(bounds.to)}`, `That window falls outside the file — it covers ${fmtDateTime(bounds.from)} to ${fmtDateTime(bounds.to)}`));
       return;
     }
     setErr(null);
@@ -466,7 +475,7 @@ function RangePicker({
                 : 'border border-line bg-surface-raised/70 text-ink-70 hover:bg-surface-raised'
             }`}
           >
-            {w.labelTh.replace('ล่าสุด', '')}
+            {windowChip(w.key, w.labelTh, locale)}
             {w.truncated && <span className="ml-1 opacity-70">*</span>}
           </button>
         ))}
@@ -479,25 +488,25 @@ function RangePicker({
         >
           <IconCalendar className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">
-            {custom ? `${fmtDateTime(custom.from)} – ${fmtDateTime(custom.to)}` : 'เลือกช่วงเอง'}
+            {custom ? `${fmtDateTime(custom.from)} – ${fmtDateTime(custom.to)}` : tr('เลือกช่วงเอง', 'Pick a window')}
           </span>
-          <span className="sm:hidden">{custom ? 'ช่วงที่เลือก' : 'เลือกช่วงเอง'}</span>
+          <span className="sm:hidden">{custom ? tr('ช่วงที่เลือก', 'Custom') : tr('เลือกช่วงเอง', 'Pick a window')}</span>
         </button>
       </div>
       {windows.some((w) => w.truncated) && (
-        <p className="mt-1.5 text-[0.76rem] text-ink-40">* ไฟล์สั้นกว่าช่วงที่เลือก — แสดงเท่าที่มี</p>
+        <p className="mt-1.5 text-[0.76rem] text-ink-40">{tr('* ไฟล์สั้นกว่าช่วงที่เลือก — แสดงเท่าที่มี', '* The file is shorter than the chosen window — showing what there is')}</p>
       )}
 
       {open && (
         <div className="glass mt-3 rounded-md p-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-[0.83rem] font-medium">ตั้งแต่</span>
+              <span className="text-[0.83rem] font-medium">{tr('ตั้งแต่', 'From')}</span>
               <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)}
                 className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
-              <span className="text-[0.83rem] font-medium">ถึง</span>
+              <span className="text-[0.83rem] font-medium">{tr('ถึง', 'To')}</span>
               <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)}
                 className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
             </label>
@@ -506,11 +515,11 @@ function RangePicker({
           <div className="mt-3 flex gap-2">
             <button onClick={apply}
               className="rounded-sm bg-accent px-4 py-2 text-[0.87rem] font-medium text-accent-ink transition hover:bg-accent-dark">
-              ดูช่วงนี้
+              {tr('ดูช่วงนี้', 'Show this window')}
             </button>
             <button onClick={() => setOpen(false)}
               className="rounded-sm border border-line px-4 py-2 text-[0.87rem] transition hover:bg-surface-raised">
-              ยกเลิก
+              {tr('ยกเลิก', 'Cancel')}
             </button>
           </div>
         </div>

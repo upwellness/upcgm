@@ -100,12 +100,33 @@ export const minuteOfDay = (t: Minutes): number => ((t % 1440) + 1440) % 1440;
 /** Midnight of the day containing `t`, as minutes. */
 export const startOfDay = (t: Minutes): Minutes => t - minuteOfDay(t);
 
-/** `2.1%` of a day → `30 นาที`; long spans read as `5 ชม. 24 นาที`. */
-export function fmtDuration(minutes: number): string {
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const EN_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * `12 Jul` — the English twin of fmtThaiDate. The year is the one difference
+ * that matters: Thai reports carry the Buddhist year, English ones must not.
+ */
+export function fmtEnDate(t: Minutes, opts?: { year?: boolean; weekday?: boolean }): string {
+  const d = new Date(t * 60000);
+  const head = opts?.weekday ? `${EN_DAYS[d.getUTCDay()]} ` : '';
+  const tail = opts?.year ? ` ${d.getUTCFullYear()}` : '';
+  return `${head}${d.getUTCDate()} ${EN_MONTHS[d.getUTCMonth()]}${tail}`;
+}
+
+/** Whichever short date the reader asked for. */
+export function fmtDate(t: Minutes, locale: 'th' | 'en', opts?: { year?: boolean; weekday?: boolean }): string {
+  return locale === 'en' ? fmtEnDate(t, opts) : fmtThaiDate(t, opts);
+}
+
+/** `2.1%` of a day → `30 นาที` / `30 min`; long spans read as `5 ชม. 24 นาที` / `5h 24m`. */
+export function fmtDuration(minutes: number, locale: 'th' | 'en' = 'th'): string {
   const m = Math.round(minutes);
-  if (m < 60) return `${m} นาที`;
+  const en = locale === 'en';
+  if (m < 60) return en ? `${m} min` : `${m} นาที`;
   const h = Math.floor(m / 60), rest = m % 60;
-  return rest === 0 ? `${h} ชม.` : `${h} ชม. ${rest} นาที`;
+  if (rest === 0) return en ? `${h}h` : `${h} ชม.`;
+  return en ? `${h}h ${rest}m` : `${h} ชม. ${rest} นาที`;
 }
 
 /** Percent of a 24h day → minutes per day. 1% = 14.4 min. */

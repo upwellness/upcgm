@@ -1,7 +1,8 @@
 import type { AgpBin } from '@/lib/types';
+import { tx, type Locale } from './i18n';
 import { minuteOfDay } from '@/lib/time';
 import { AGP_BIN_MINUTES } from './metrics';
-import { PATTERNS, type PatternKey } from './patterns';
+import { patternDefs, type PatternKey } from './patterns';
 import type { CgmEvent } from './excursions';
 
 /**
@@ -42,7 +43,9 @@ export const MIN_CLUSTER = 2;
 /** Dots beyond this just clutter the picture. */
 export const MAX_NOTES = 6;
 
-export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
+export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[], locale: Locale = 'th'): AgpNote[] {
+  const t = tx(locale);
+  const PATTERNS = patternDefs(locale);
   const usable = bins.filter((b) => b.p50 != null && !b.lowConfidence);
   if (usable.length < 8) return [];
 
@@ -73,8 +76,8 @@ export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
       atValue: v,
       kind: 'shape-cluster',
       pattern: topShape,
-      titleTh: `${binLabel(minute)} — เจอ “${d.labelTh}” ${count} ครั้ง`,
-      bodyTh: `${d.meaningTh} · ช่วงเวลานี้ของวันคือจุดที่เกิดซ้ำมากที่สุด — ${d.firstMoveTh}`,
+      titleTh: t(`${binLabel(minute)} — เจอ “${d.labelTh}” ${count} ครั้ง`, `${binLabel(minute)} — “${d.labelTh}” ${count} ${count === 1 ? 'time' : 'times'}`),
+      bodyTh: t(`${d.meaningTh} · ช่วงเวลานี้ของวันคือจุดที่เกิดซ้ำมากที่สุด — ${d.firstMoveTh}`, `${d.meaningTh}. This time of day is where it repeats most — ${d.firstMoveTh}`),
       weight: 100 + count * 10 + (topShape === 'crash' ? 5 : 0),
     });
   }
@@ -91,8 +94,8 @@ export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
       atValue: b.p50 as number,
       kind: 'widest',
       pattern: null,
-      titleTh: `${binLabel(b.minute)} — ช่วงที่แต่ละวันต่างกันมากที่สุด`,
-      bodyTh: `ห่างกัน ${Math.round(spread)} มก./ดล. ระหว่างวันที่สูงสุดกับต่ำสุด · แปลว่าช่วงนี้ยังไม่เป็นกิจวัตร — สิ่งที่ทำตอนนี้ของแต่ละวันไม่เหมือนกัน`,
+      titleTh: t(`${binLabel(b.minute)} — ช่วงที่แต่ละวันต่างกันมากที่สุด`, `${binLabel(b.minute)} — the hour that varies most between days`),
+      bodyTh: t(`ห่างกัน ${Math.round(spread)} มก./ดล. ระหว่างวันที่สูงสุดกับต่ำสุด · แปลว่าช่วงนี้ยังไม่เป็นกิจวัตร — สิ่งที่ทำตอนนี้ของแต่ละวันไม่เหมือนกัน`, `${Math.round(spread)} mg/dL between the highest and lowest day. This hour is not yet a routine — what happens at this time differs day to day.`),
       weight: 60,
     });
   }
@@ -106,8 +109,8 @@ export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
       atValue: hi.p50 as number,
       kind: 'highest',
       pattern: null,
-      titleTh: `${binLabel(hi.minute)} — จุดสูงสุดของวันปกติ`,
-      bodyTh: `ค่ากลางอยู่ที่ ${Math.round(hi.p50 as number)} มก./ดล. · ถ้าจะแก้ทีละอย่าง เริ่มจากสิ่งที่เกิดก่อนเวลานี้`,
+      titleTh: t(`${binLabel(hi.minute)} — จุดสูงสุดของวันปกติ`, `${binLabel(hi.minute)} — the high point of a typical day`),
+      bodyTh: t(`ค่ากลางอยู่ที่ ${Math.round(hi.p50 as number)} มก./ดล. · ถ้าจะแก้ทีละอย่าง เริ่มจากสิ่งที่เกิดก่อนเวลานี้`, `The median sits at ${Math.round(hi.p50 as number)} mg/dL. If you change one thing, start with what happens before this hour.`),
       weight: 55,
     });
     notes.push({
@@ -115,8 +118,8 @@ export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
       atValue: lo.p50 as number,
       kind: 'lowest',
       pattern: null,
-      titleTh: `${binLabel(lo.minute)} — จุดต่ำสุดของวันปกติ`,
-      bodyTh: `ค่ากลางอยู่ที่ ${Math.round(lo.p50 as number)} มก./ดล.`,
+      titleTh: t(`${binLabel(lo.minute)} — จุดต่ำสุดของวันปกติ`, `${binLabel(lo.minute)} — the low point of a typical day`),
+      bodyTh: t(`ค่ากลางอยู่ที่ ${Math.round(lo.p50 as number)} มก./ดล.`, `The median sits at ${Math.round(lo.p50 as number)} mg/dL.`),
       weight: 40,
     });
   }
@@ -134,8 +137,8 @@ export function buildAgpNotes(bins: AgpBin[], events: CgmEvent[]): AgpNote[] {
         atValue: v,
         kind: 'overnight',
         pattern: null,
-        titleTh: `กลางคืน — น้ำตาลขึ้นเอง ${overnight.length} ครั้ง`,
-        bodyTh: 'ช่วง 00:00–06:00 ส่วนใหญ่ไม่ได้มาจากอาหาร · น้ำตาลขึ้นเองตอนเช้ามืดได้ ถ้าเกิดซ้ำทุกคืนเป็นเรื่องที่ควรให้แพทย์ดู ไม่ใช่เรื่องที่ปรับด้วยเมนู',
+        titleTh: t(`กลางคืน — น้ำตาลขึ้นเอง ${overnight.length} ครั้ง`, `Overnight — glucose rose on its own ${overnight.length} ${overnight.length === 1 ? 'time' : 'times'}`),
+        bodyTh: t('ช่วง 00:00–06:00 ส่วนใหญ่ไม่ได้มาจากอาหาร · น้ำตาลขึ้นเองตอนเช้ามืดได้ ถ้าเกิดซ้ำทุกคืนเป็นเรื่องที่ควรให้แพทย์ดู ไม่ใช่เรื่องที่ปรับด้วยเมนู', 'Between 00:00 and 06:00 this is usually not food. Glucose can rise on its own before dawn; if it repeats most nights that is one for a doctor to look at, not something a menu change fixes.'),
         weight: 80,
       });
     }

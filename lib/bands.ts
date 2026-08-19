@@ -13,7 +13,9 @@
 export interface Band {
   key: 'tbr54' | 'tbr70' | 'tir' | 'tar180' | 'tar250';
   labelTh: string;
+  labelEn: string;
   shortTh: string;
+  shortEn: string;
   lo: number | null;
   hi: number | null;
   fill: string;
@@ -23,11 +25,11 @@ export interface Band {
 }
 
 export const BANDS: Band[] = [
-  { key: 'tbr54', labelTh: 'ต่ำมาก · ต่ำกว่า 54', shortTh: '<54', lo: null, hi: 54, fill: 'rgb(var(--c-zone-vlow))', ink: 'rgb(var(--c-zone-vlow))', wash: 'rgba(58,110,134,.16)' },
-  { key: 'tbr70', labelTh: 'ต่ำ · 54–69', shortTh: '54–69', lo: 54, hi: 70, fill: 'rgb(var(--c-zone-low))', ink: 'rgb(var(--c-zone-low))', wash: 'rgba(58,110,134,.10)' },
-  { key: 'tir', labelTh: 'อยู่ในเป้าหมาย · 70–180', shortTh: '70–180', lo: 70, hi: 180, fill: 'rgb(var(--c-zone-in))', ink: 'rgb(var(--c-zone-in-ink))', wash: 'rgba(62,142,90,.09)' },
-  { key: 'tar180', labelTh: 'สูง · 181–250', shortTh: '181–250', lo: 180, hi: 250, fill: 'rgb(var(--c-zone-high))', ink: 'rgb(var(--c-zone-high-ink))', wash: 'rgba(201,138,30,.11)' },
-  { key: 'tar250', labelTh: 'สูงมาก · มากกว่า 250', shortTh: '>250', lo: 250, hi: null, fill: 'rgb(var(--c-zone-vhigh))', ink: 'rgb(var(--c-zone-vhigh))', wash: 'rgba(180,71,47,.13)' },
+  { key: 'tbr54', labelTh: 'ต่ำมาก · ต่ำกว่า 54', labelEn: 'Very low · below 54', shortTh: '<54', shortEn: '<54', lo: null, hi: 54, fill: 'rgb(var(--c-zone-vlow))', ink: 'rgb(var(--c-zone-vlow))', wash: 'rgba(58,110,134,.16)' },
+  { key: 'tbr70', labelTh: 'ต่ำ · 54–69', labelEn: 'Low · 54–69', shortTh: '54–69', shortEn: '54–69', lo: 54, hi: 70, fill: 'rgb(var(--c-zone-low))', ink: 'rgb(var(--c-zone-low))', wash: 'rgba(58,110,134,.10)' },
+  { key: 'tir', labelTh: 'อยู่ในเป้าหมาย · 70–180', labelEn: 'In target · 70–180', shortTh: '70–180', shortEn: '70–180', lo: 70, hi: 180, fill: 'rgb(var(--c-zone-in))', ink: 'rgb(var(--c-zone-in-ink))', wash: 'rgba(62,142,90,.09)' },
+  { key: 'tar180', labelTh: 'สูง · 181–250', labelEn: 'High · 181–250', shortTh: '181–250', shortEn: '181–250', lo: 180, hi: 250, fill: 'rgb(var(--c-zone-high))', ink: 'rgb(var(--c-zone-high-ink))', wash: 'rgba(201,138,30,.11)' },
+  { key: 'tar250', labelTh: 'สูงมาก · มากกว่า 250', labelEn: 'Very high · above 250', shortTh: '>250', shortEn: '>250', lo: 250, hi: null, fill: 'rgb(var(--c-zone-vhigh))', ink: 'rgb(var(--c-zone-vhigh))', wash: 'rgba(180,71,47,.13)' },
 ];
 
 export const BAND_BY_KEY = Object.fromEntries(BANDS.map((b) => [b.key, b])) as Record<Band['key'], Band>;
@@ -55,10 +57,10 @@ export const TIGHT_LO = 70;
 export const TIGHT_HI = 140;
 
 export const SEVERITY_STYLE = {
-  urgent: { dot: 'rgb(var(--c-zone-vhigh))', chip: 'rgba(180,71,47,.12)', ink: 'rgb(var(--c-zone-vhigh))', labelTh: 'ต้องคุยก่อน' },
-  attention: { dot: 'rgb(var(--c-zone-high))', chip: 'rgba(201,138,30,.13)', ink: 'rgb(var(--c-zone-high-ink))', labelTh: 'ควรดู' },
-  watch: { dot: 'rgb(var(--c-zone-low))', chip: 'rgba(58,110,134,.12)', ink: 'rgb(var(--c-zone-low))', labelTh: 'เฝ้าดู' },
-  good: { dot: 'rgb(var(--c-zone-in))', chip: 'rgba(62,142,90,.12)', ink: 'rgb(var(--c-zone-in-ink))', labelTh: 'ผ่านเกณฑ์' },
+  urgent: { dot: 'rgb(var(--c-zone-vhigh))', chip: 'rgba(180,71,47,.12)', ink: 'rgb(var(--c-zone-vhigh))', labelTh: 'ต้องคุยก่อน', labelEn: 'Talk about first' },
+  attention: { dot: 'rgb(var(--c-zone-high))', chip: 'rgba(201,138,30,.13)', ink: 'rgb(var(--c-zone-high-ink))', labelTh: 'ควรดู', labelEn: 'Worth a look' },
+  watch: { dot: 'rgb(var(--c-zone-low))', chip: 'rgba(58,110,134,.12)', ink: 'rgb(var(--c-zone-low))', labelTh: 'เฝ้าดู', labelEn: 'Keep an eye on' },
+  good: { dot: 'rgb(var(--c-zone-in))', chip: 'rgba(62,142,90,.12)', ink: 'rgb(var(--c-zone-in-ink))', labelTh: 'ผ่านเกณฑ์', labelEn: 'Meets the goal' },
 } as const;
 
 /**
@@ -83,11 +85,11 @@ export const PATTERN_STYLE = {
 export type PatternKey = keyof typeof PATTERN_STYLE;
 
 export const MEAL_KINDS = [
-  { key: 'breakfast', labelTh: 'มื้อเช้า', glyph: '🌅' },
-  { key: 'lunch', labelTh: 'มื้อกลางวัน', glyph: '🍚' },
-  { key: 'dinner', labelTh: 'มื้อเย็น', glyph: '🍽️' },
-  { key: 'snack', labelTh: 'ของว่าง', glyph: '🍪' },
-  { key: 'drink', labelTh: 'เครื่องดื่ม', glyph: '🥤' },
+  { key: 'breakfast', labelTh: 'มื้อเช้า', labelEn: 'Breakfast', glyph: '🌅' },
+  { key: 'lunch', labelTh: 'มื้อกลางวัน', labelEn: 'Lunch', glyph: '🍚' },
+  { key: 'dinner', labelTh: 'มื้อเย็น', labelEn: 'Dinner', glyph: '🍽️' },
+  { key: 'snack', labelTh: 'ของว่าง', labelEn: 'Snack', glyph: '🍪' },
+  { key: 'drink', labelTh: 'เครื่องดื่ม', labelEn: 'Drink', glyph: '🥤' },
 ] as const;
 
 /**
@@ -102,4 +104,51 @@ export function fmtPct(n: number, decimals = 1): string {
     return `${(Math.floor(n * 100) / 100).toFixed(2)}%`;
   }
   return `${rounded}%`;
+}
+
+
+/**
+ * Pick whichever language the reader asked for out of a `…Th`/`…En` pair.
+ * Keeps components from spelling out the ternary at every label.
+ */
+export function pick<T extends Record<string, unknown>>(
+  obj: T,
+  base: string,
+  locale: 'th' | 'en',
+): string {
+  const key = `${base}${locale === 'en' ? 'En' : 'Th'}`;
+  return String(obj[key] ?? obj[`${base}Th`] ?? '');
+}
+
+
+/** Window preset labels, resolved on the client so switching language is instant. */
+const WINDOW_LABELS: Record<string, [string, string]> = {
+  '30d': ['30 วันล่าสุด', 'Last 30 days'],
+  '14d': ['14 วันล่าสุด', 'Last 14 days'],
+  '7d': ['7 วันล่าสุด', 'Last 7 days'],
+  '3d': ['3 วันล่าสุด', 'Last 3 days'],
+  '24h': ['24 ชั่วโมงล่าสุด', 'Last 24 hours'],
+  '12h': ['12 ชั่วโมงล่าสุด', 'Last 12 hours'],
+  '6h': ['6 ชั่วโมงล่าสุด', 'Last 6 hours'],
+  '3h': ['3 ชั่วโมงล่าสุด', 'Last 3 hours'],
+};
+
+/**
+ * The label for a window, in the reader's language. Falls back to whatever the
+ * server sent for a custom range, which is a formatted date pair either way.
+ */
+export function windowLabel(key: string, serverLabel: string, locale: 'th' | 'en'): string {
+  const pair = WINDOW_LABELS[key];
+  return pair ? pair[locale === 'en' ? 1 : 0] : serverLabel;
+}
+
+/** Short form for the picker chips: drops the leading "Last"/trailing "ล่าสุด". */
+export function windowChip(key: string, serverLabel: string, locale: 'th' | 'en'): string {
+  return windowLabel(key, serverLabel, locale).replace('ล่าสุด', '').replace('Last ', '').trim();
+}
+
+/** Band label by key, so a range bar re-labels itself on a language switch. */
+export function bandLabel(key: string, serverLabel: string, locale: 'th' | 'en'): string {
+  const b = BANDS.find((x) => x.key === key);
+  return b ? pick(b as unknown as Record<string, unknown>, 'label', locale) : serverLabel;
 }

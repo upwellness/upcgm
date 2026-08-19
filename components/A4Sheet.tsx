@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef } from 'react';
+import { usePrefs, useT } from './PrefsProvider';
 import { BANDS, PATTERN_STYLE, fmtPct, type PatternKey } from '@/lib/bands';
 import { fmtDuration, fmtThaiDate, pctToMinutesPerDay } from '@/lib/time';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
@@ -53,6 +54,8 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
   // both costs a third of a page and buys nothing. The one exception is the
   // crash-on-medication finding: that is a safety line, and it belongs at the
   // top of the page where a doctor will see it, not in a chart legend.
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const top = findings
     .filter((f) => f.severity !== 'good')
     .filter((f) => !f.id.startsWith('pattern-') || f.id === 'pattern-crash-meds')
@@ -71,13 +74,13 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
       <header className="flex items-start justify-between border-b-2 pb-3" style={{ borderColor: '#3D5826' }}>
         <div>
           <div className="font-head text-[1.35rem] font-semibold leading-tight" style={{ color: '#2E4420' }}>
-            สรุปผลน้ำตาลต่อเนื่อง (CGM)
+            {t('สรุปผลน้ำตาลต่อเนื่อง (CGM)', 'Continuous glucose summary (CGM)')}
           </div>
           <div className="mt-0.5 text-[0.82rem] text-ink-70">
-            {clientName ? `คุณ${clientName} · ` : ''}
+            {clientName ? t(`คุณ${clientName} · `, `${clientName} · `) : ''}
             {fmtThaiDate(w.from, { year: true })} – {fmtThaiDate(w.to, { year: true })}
             {' · '}
-            <span className="num">{w.days < 1 ? fmtDuration(Math.round(w.days * 1440)) : `${w.days.toFixed(1)} วัน`}</span>
+            <span className="num">{w.days < 1 ? fmtDuration(Math.round(w.days * 1440), locale) : t(`${w.days.toFixed(1)} วัน`, `${w.days.toFixed(1)} days`)}</span>
           </div>
         </div>
         <div className="text-right">
@@ -92,19 +95,19 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
       {m && (
         <>
           <div className="mt-4 grid grid-cols-4 gap-2.5">
-            <Big label="อยู่ในช่วงเป้าหมาย" value={w.gate.showRangePercents ? pc(m.tir70_180) : '—'} hint="70–180" tone="#367C4F" />
-            <Big label="ค่าเฉลี่ย" value={String(Math.round(m.mean))} hint="มก./ดล." tone="#2A2E22" />
-            <Big label="ความแกว่ง" value={w.gate.showCv ? pc(m.cv) : '—'} hint="CV · เกณฑ์ ≤ 36%" tone={m.cv <= 36 ? '#367C4F' : '#946516'} />
+            <Big label={t('อยู่ในช่วงเป้าหมาย', 'In target')} value={w.gate.showRangePercents ? pc(m.tir70_180) : '—'} hint="70–180" tone="#367C4F" />
+            <Big label={t('ค่าเฉลี่ย', 'Average')} value={String(Math.round(m.mean))} hint={t('มก./ดล.', 'mg/dL')} tone="#2A2E22" />
+            <Big label={t('ความแกว่ง', 'Variability')} value={w.gate.showCv ? pc(m.cv) : '—'} hint={t('CV · เกณฑ์ ≤ 36%', 'CV · goal 36% or less')} tone={m.cv <= 36 ? '#367C4F' : '#946516'} />
             <Big
-              label="ประมาณ HbA1c"
+              label={t('ประมาณ HbA1c', 'Estimated HbA1c')}
               value={w.gate.showGmi && m.gmi != null ? `${m.gmi.toFixed(1)}%` : '—'}
-              hint="GMI · ไม่ใช่ผลเลือด"
+              hint={t('GMI · ไม่ใช่ผลเลือด', 'GMI · not a blood test')}
               tone="#2A2E22"
             />
           </div>
 
           <div className="mt-4">
-            <SectionTitle>สัดส่วนเวลาในแต่ละช่วง</SectionTitle>
+            <SectionTitle>{t('สัดส่วนเวลาในแต่ละช่วง', 'Share of time in each band')}</SectionTitle>
             <div className="mt-2 flex h-7 overflow-hidden rounded" style={{ background: '#EFEAE0' }}>
               {[
                 { b: BANDS[0], p: m.tbrUnder54 },
@@ -132,7 +135,7 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
       )}
 
       <div className="mt-4">
-        <SectionTitle>{showAgp ? 'ภาพวันปกติของคุณ (รวมทุกวันซ้อนกัน)' : 'กราฟน้ำตาลในช่วงที่ดู'}</SectionTitle>
+        <SectionTitle>{showAgp ? t('ภาพวันปกติของคุณ (รวมทุกวันซ้อนกัน)', 'Your typical day (every day overlaid)') : t('กราฟน้ำตาลในช่วงที่ดู', 'Glucose across the window shown')}</SectionTitle>
         <div className="mt-1.5 rounded border" style={{ borderColor: 'rgba(42,46,34,.12)', padding: '4px 2px' }}>
           {showAgp ? (
             <AgpChart bins={w.agp} height={196} />
@@ -151,14 +154,14 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
         </div>
         {showAgp && (
           <p className="mt-1 text-[0.68rem] text-ink-40">
-            เส้นเข้มคือค่ากลาง แถบเข้มคือช่วงที่พบบ่อย (25–75%) แถบอ่อนคือ 5–95% — แถบยิ่งกว้าง วันแต่ละวันยิ่งต่างกัน
+            {t('เส้นเข้มคือค่ากลาง แถบเข้มคือช่วงที่พบบ่อย (25–75%) แถบอ่อนคือ 5–95% — แถบยิ่งกว้าง วันแต่ละวันยิ่งต่างกัน', 'The dark line is the median, the dark band the common range (25–75%), the pale band 5–95%. The wider the band, the more the days differ.')}
           </p>
         )}
       </div>
 
       {top.length > 0 && (
         <div className="mt-4">
-          <SectionTitle>สิ่งที่ควรทำต่อ</SectionTitle>
+          <SectionTitle>{t('สิ่งที่ควรทำต่อ', 'What to do next')}</SectionTitle>
           <ol className="mt-2 space-y-2">
             {top.map((f, i) => (
               <li key={f.id} className="flex gap-2.5">
@@ -176,7 +179,7 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
 
       {patterns && patterns.judged > 0 && (
         <div className="mt-3.5">
-          <SectionTitle>รูปร่างกราฟหลังมื้ออาหาร</SectionTitle>
+          <SectionTitle>{t('รูปร่างกราฟหลังมื้ออาหาร', 'Post-meal curve shapes')}</SectionTitle>
           <p className="mt-1 text-[0.82rem] leading-relaxed">{patterns.headlineTh}</p>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
             {(['crash', 'stuck', 'spike', 'wide', 'flat'] as PatternKey[])
@@ -190,14 +193,14 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
                   <span className="text-[0.78rem] font-medium" style={{ color: PATTERN_STYLE[k].ink }}>
                     {PATTERN_STYLE[k].labelTh}
                   </span>
-                  <span className="num text-[0.76rem] text-ink-70">{patterns.counts[k]} มื้อ</span>
+                  <span className="num text-[0.76rem] text-ink-70">{t(`${patterns.counts[k]} มื้อ`, `${patterns.counts[k]} ${patterns.counts[k] === 1 ? 'meal' : 'meals'}`)}</span>
                 </span>
               ))}
           </div>
           {patterns.firstMoveTh && (
             <p className="mt-1.5 rounded px-2.5 py-1.5 text-[0.8rem] leading-relaxed"
               style={{ background: 'rgba(93,110,72,.10)' }}>
-              <span className="font-medium" style={{ color: '#5D6E48' }}>ลองแบบเดียวก่อน · </span>
+              <span className="font-medium" style={{ color: '#5D6E48' }}>{t('ลองแบบเดียวก่อน · ', 'Try one shape first · ')}</span>
               {patterns.firstMoveTh}
             </p>
           )}
@@ -206,7 +209,7 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
 
       {good.length > 0 && (
         <div className="mt-3.5 rounded px-3 py-2" style={{ background: 'rgba(62,142,90,.09)' }}>
-          <div className="text-[0.78rem] font-medium" style={{ color: '#367C4F' }}>สิ่งที่ทำได้ดีอยู่แล้ว</div>
+          <div className="text-[0.78rem] font-medium" style={{ color: '#367C4F' }}>{t('สิ่งที่ทำได้ดีอยู่แล้ว', 'Already going well')}</div>
           <ul className="mt-0.5 space-y-0.5">
             {good.map((f) => (
               <li key={f.id} className="num text-[0.76rem] text-ink-70">· {f.titleTh} — {f.evidenceTh}</li>
@@ -217,14 +220,14 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
 
       {coachNote.trim() && (
         <div className="mt-3.5">
-          <SectionTitle>บันทึกจากโค้ช</SectionTitle>
+          <SectionTitle>{t('บันทึกจากโค้ช', 'Note from the coach')}</SectionTitle>
           <p className="mt-1 whitespace-pre-wrap text-[0.85rem] leading-relaxed">{coachNote.trim()}</p>
         </div>
       )}
 
       <footer className="mt-auto pt-4">
         <div className="rounded px-3 py-2.5" style={{ background: '#F7F4EE' }}>
-          <div className="text-[0.72rem] font-medium text-ink-70">ข้อจำกัดของรายงานนี้</div>
+          <div className="text-[0.72rem] font-medium text-ink-70">{t('ข้อจำกัดของรายงานนี้', 'Limits of this report')}</div>
           <ul className="mt-1 space-y-0.5">
             {limitationsTh.slice(0, 4).map((l, i) => (
               <li key={i} className="text-[0.7rem] leading-snug text-ink-70">· {l}</li>
@@ -232,8 +235,10 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
           </ul>
         </div>
         <p className="mt-2 text-center text-[0.66rem] text-ink-40">
-          เอกสารนี้ใช้เพื่อพูดคุยเรื่องพฤติกรรมสุขภาพ ไม่ใช่การวินิจฉัยโรค ไม่ใช้แทนคำแนะนำของแพทย์
-          และไม่ใช้ตัดสินใจเรื่องยาด้วยตัวเอง
+          {t(
+            'เอกสารนี้ใช้เพื่อพูดคุยเรื่องพฤติกรรมสุขภาพ ไม่ใช่การวินิจฉัยโรค ไม่ใช้แทนคำแนะนำของแพทย์ และไม่ใช้ตัดสินใจเรื่องยาด้วยตัวเอง',
+            'This sheet supports a conversation about habits. It is not a diagnosis, does not replace medical advice, and must not be used to make decisions about medication.',
+          )}
         </p>
       </footer>
     </div>

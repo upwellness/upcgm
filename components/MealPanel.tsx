@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { usePrefs, useT } from './PrefsProvider';
 import { MEAL_KINDS, type PatternKey } from '@/lib/bands';
 import { mealResponse } from '@/lib/meal-response';
 import { fmtDateTime, fmtDuration, toLocalInputValue, fromLocalInputValue } from '@/lib/time';
@@ -27,7 +28,8 @@ const PATTERN_LABEL: Record<PatternKey, string> = {
   spike: 'พุ่ง', wide: 'กว้าง', stuck: 'ค้าง', crash: 'ตก', flat: 'เรียบ',
 };
 
-const CHECKPOINT_LABEL: Record<number, string> = { 60: '1 ชม.', 120: '2 ชม.', 180: '3 ชม.' };
+const checkpointLabel = (t: (a: string, b: string) => string): Record<number, string> =>
+  ({ 60: t('1 ชม.', '1h'), 120: t('2 ชม.', '2h'), 180: t('3 ชม.', '3h') });
 
 interface Props {
   datasetId: string;
@@ -43,6 +45,8 @@ interface Props {
 }
 
 export default function MealPanel({ datasetId, sourceName, readings, markers, onChange, defaultT, storageWorks, perMeal }: Props) {
+  const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const [draft, setDraft] = useState<MealMarker | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -70,14 +74,14 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
     if (!draft) return;
     const label = draft.label.trim();
     if (!label) {
-      setNotice({ tone: 'warn', text: 'ใส่ชื่อมื้อสั้น ๆ ก่อน เช่น “ข้าวมันไก่” — ไว้เทียบกันคราวหลัง' });
+      setNotice({ tone: 'warn', text: t('ใส่ชื่อมื้อสั้น ๆ ก่อน เช่น “ข้าวมันไก่” — ไว้เทียบกันคราวหลัง', 'Give the meal a short name first, e.g. “chicken rice” — so it can be compared next time.') });
       return;
     }
     const next = [...markers.filter((m) => m.id !== draft.id), { ...draft, label, updatedAt: Date.now() }]
       .sort((a, b) => a.t - b.t);
     onChange(next);
     setDraft(null);
-    setNotice({ tone: 'ok', text: `บันทึก “${label}” แล้ว — จดจำอัตโนมัติในเครื่องนี้ ไม่ต้องกดซ้ำ` });
+    setNotice({ tone: 'ok', text: t(`บันทึก “${label}” แล้ว — จดจำอัตโนมัติในเครื่องนี้ ไม่ต้องกดซ้ำ`, `Saved “${label}” — remembered on this device automatically, no need to save again.`) });
   }
 
   function remove(id: string) {
@@ -100,38 +104,38 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
     const text = await f.text();
     const res = fromFile(text, datasetId);
     if (!res.ok) {
-      setNotice({ tone: 'warn', text: res.errorTh ?? 'อ่านไฟล์ไม่ได้' });
+      setNotice({ tone: 'warn', text: res.errorTh ?? t('อ่านไฟล์ไม่ได้', 'Could not read the file.') });
       return;
     }
     if (res.mismatch) {
       const go = window.confirm(
-        'ไฟล์มื้ออาหารนี้มาจากไฟล์ CGM ชุดอื่น\n\nถ้าเป็นคนเดียวกันและส่งออกใหม่ก็โหลดต่อได้ แต่ถ้าเป็นเคสอื่น มื้ออาหารจะไปทับกราฟผิดคน\n\nยืนยันโหลดต่อ?',
+        t('ไฟล์มื้ออาหารนี้มาจากไฟล์ CGM ชุดอื่น\n\nถ้าเป็นคนเดียวกันและส่งออกใหม่ก็โหลดต่อได้ แต่ถ้าเป็นเคสอื่น มื้ออาหารจะไปทับกราฟผิดคน\n\nยืนยันโหลดต่อ?', 'This meal file came from a different CGM export.\n\nIf it is the same person re-exported, loading is fine. If it is a different client, the meals will land on the wrong chart.\n\nLoad anyway?'),
       );
       if (!go) return;
     }
     onChange(res.markers);
-    setNotice({ tone: 'ok', text: `โหลดมื้ออาหาร ${res.markers.length} รายการเรียบร้อย` });
+    setNotice({ tone: 'ok', text: t(`โหลดมื้ออาหาร ${res.markers.length} รายการเรียบร้อย`, `Loaded ${res.markers.length} meals.`) });
   }
 
   return (
     <section className="glass rounded-lg p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-head text-[1.05rem] font-semibold">มื้ออาหารที่บันทึกไว้</h2>
+        <h2 className="font-head text-[1.05rem] font-semibold">{t('มื้ออาหารที่บันทึกไว้', 'Logged meals')}</h2>
         <span className="num rounded-full bg-surface-sunken px-2.5 py-0.5 text-[0.78rem] text-ink-70">
-          {markers.length} มื้อ
+          {t(`${markers.length} มื้อ`, `${markers.length} ${markers.length === 1 ? 'meal' : 'meals'}`)}
         </span>
         <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
           <button onClick={startNew}
             className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent px-3 py-2 text-[0.85rem] font-medium text-accent-ink transition hover:bg-accent-dark sm:flex-none">
-            <IconPlus className="h-3.5 w-3.5" /> เพิ่มมื้อ
+            <IconPlus className="h-3.5 w-3.5" /> {t('เพิ่มมื้อ', 'Add meal')}
           </button>
           <button onClick={download} disabled={markers.length === 0}
             className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-surface-raised disabled:opacity-40 sm:flex-none">
-            <IconDownload className="h-3.5 w-3.5" /> บันทึกเป็นไฟล์
+            <IconDownload className="h-3.5 w-3.5" /> {t('บันทึกเป็นไฟล์', 'Save to file')}
           </button>
           <button onClick={() => fileRef.current?.click()}
             className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-surface-raised sm:flex-none">
-            <IconUpload className="h-3.5 w-3.5" /> โหลดจากไฟล์
+            <IconUpload className="h-3.5 w-3.5" /> {t('โหลดจากไฟล์', 'Load from file')}
           </button>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden"
             onChange={(e) => {
@@ -146,8 +150,8 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
 
       <p className="mt-2 text-[0.82rem] leading-relaxed text-ink-40">
         {storageWorks
-          ? 'มื้ออาหารเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นเซิร์ฟเวอร์ — เปิดไฟล์เดิมอีกครั้งจะขึ้นให้เอง ถ้าจะย้ายเครื่องให้กดบันทึกเป็นไฟล์'
-          : 'เบราว์เซอร์นี้ไม่ให้เก็บข้อมูลในเครื่อง (อาจอยู่ในโหมดส่วนตัว) — มื้ออาหารจะหายเมื่อปิดหน้านี้ ให้กดบันทึกเป็นไฟล์ไว้'}
+          ? t('มื้ออาหารเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นเซิร์ฟเวอร์ — เปิดไฟล์เดิมอีกครั้งจะขึ้นให้เอง ถ้าจะย้ายเครื่องให้กดบันทึกเป็นไฟล์', 'Meals stay in this browser and are never sent to a server. Reopen the same file and they come back. To move them to another device, save them to a file.')
+            : t('เบราว์เซอร์นี้ไม่ให้เก็บข้อมูลในเครื่อง (อาจอยู่ในโหมดส่วนตัว) — มื้ออาหารจะหายเมื่อปิดหน้านี้ ให้กดบันทึกเป็นไฟล์ไว้', 'This browser will not store data locally (private mode, most likely) — meals will be lost when this page closes. Save them to a file.')}
       </p>
 
       {notice && (
@@ -161,14 +165,14 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
         <div className="mt-4 rounded-md border border-olive/25 bg-surface-raised/70 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-[0.83rem] font-medium">ชื่อมื้อ</span>
+              <span className="text-[0.83rem] font-medium">{t('ชื่อมื้อ', 'Meal name')}</span>
               <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                placeholder="เช่น ข้าวมันไก่ / ก๋วยเตี๋ยวต้มยำ"
+                placeholder={t('เช่น ข้าวมันไก่ / ก๋วยเตี๋ยวต้มยำ', 'e.g. chicken rice / tom yum noodles')}
                 maxLength={60} autoFocus
                 className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
-              <span className="text-[0.83rem] font-medium">เวลาที่เริ่มกิน</span>
+              <span className="text-[0.83rem] font-medium">{t('เวลาที่เริ่มกิน', 'Time eating started')}</span>
               <input type="datetime-local" value={toLocalInputValue(draft.t)}
                 onChange={(e) => {
                   const t = fromLocalInputValue(e.target.value);
@@ -177,20 +181,20 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                 className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
-              <span className="text-[0.83rem] font-medium">ประเภท</span>
+              <span className="text-[0.83rem] font-medium">{t('ประเภท', 'Type')}</span>
               <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as MealMarker['kind'] })}
                 className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
                 {MEAL_KINDS.map((k) => <option key={k.key} value={k.key}>{k.glyph} {k.labelTh}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="text-[0.83rem] font-medium">ลำดับการกิน</span>
+              <span className="text-[0.83rem] font-medium">{t('ลำดับการกิน', 'Eating order')}</span>
               <select value={draft.eatingOrder ?? 'unknown'}
                 onChange={(e) => setDraft({ ...draft, eatingOrder: e.target.value as MealMarker['eatingOrder'] })}
                 className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
-                <option value="unknown">ไม่ได้สังเกต</option>
-                <option value="veg-first">กินผัก/โปรตีนก่อนคาร์บ</option>
-                <option value="carb-first">กินคาร์บก่อน</option>
+                <option value="unknown">{t('ไม่ได้สังเกต', 'Not noted')}</option>
+                <option value="veg-first">{t('กินผัก/โปรตีนก่อนคาร์บ', 'Vegetables/protein before carbs')}</option>
+                <option value="carb-first">{t('กินคาร์บก่อน', 'Carbs first')}</option>
               </select>
             </label>
           </div>
@@ -198,16 +202,16 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
             <input type="checkbox" checked={draft.walkedAfter ?? false}
               onChange={(e) => setDraft({ ...draft, walkedAfter: e.target.checked })}
               className="h-4 w-4 rounded border-line accent-olive" />
-            เดินหลังมื้อนี้ 10 นาทีขึ้นไป
+            {t('เดินหลังมื้อนี้ 10 นาทีขึ้นไป', 'Walked 10 minutes or more after this meal')}
           </label>
           <div className="mt-4 flex gap-2">
             <button onClick={commit}
               className="min-h-[2.75rem] flex-1 rounded-sm bg-accent px-4 py-2 text-[0.88rem] sm:flex-none font-medium text-accent-ink transition hover:bg-accent-dark">
-              บันทึกมื้อนี้
+              {t('บันทึกมื้อนี้', 'Save this meal')}
             </button>
             <button onClick={() => { setDraft(null); setNotice(null); }}
               className="min-h-[2.75rem] flex-1 rounded-sm border border-line px-4 py-2 text-[0.88rem] sm:flex-none transition hover:bg-surface-raised">
-              ยกเลิก
+              {t('ยกเลิก', 'Cancel')}
             </button>
           </div>
         </div>
@@ -228,14 +232,14 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                   {shape?.primary && <PatternChip k={shape.primary} size="sm" />}
                   {!shape && (
                     <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"
-                      title="มื้อนี้อยู่นอกช่วงเวลาที่เลือกอยู่ จึงไม่ถูกนำมาวิเคราะห์รูปร่าง">
-                      นอกช่วงที่เลือก
+                      title={t('มื้อนี้อยู่นอกช่วงเวลาที่เลือกอยู่ จึงไม่ถูกนำมาวิเคราะห์รูปร่าง', 'This meal sits outside the selected window, so its shape was not analysed.')}>
+                      {t('นอกช่วงที่เลือก', 'outside the window')}
                     </span>
                   )}
                   {shape && !shape.primary && (
                     <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"
                       title={shape.skippedReasonTh ?? ''}>
-                      {shape.noShape === 'thin-data' ? 'ข้อมูลไม่พอ' : 'อยู่กลาง ๆ ระหว่างแบบ'}
+                      {shape.noShape === 'thin-data' ? t('ข้อมูลไม่พอ', 'not enough data') : t('อยู่กลาง ๆ ระหว่างแบบ', 'between shapes')}
                     </span>
                   )}
                   {shape?.also.map((k) => (
@@ -244,12 +248,12 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                     </span>
                   ))}
                   {m.eatingOrder === 'veg-first' && (
-                    <span className="rounded-full bg-zone-in/12 px-2 py-0.5 text-[0.72rem] text-zone-in-ink">ผักก่อน</span>
+                    <span className="rounded-full bg-zone-in/12 px-2 py-0.5 text-[0.72rem] text-zone-in-ink">{t('ผักก่อน', 'veg first')}</span>
                   )}
                   {m.walkedAfter && (
-                    <span className="rounded-full bg-zone-in/12 px-2 py-0.5 text-[0.72rem] text-zone-in-ink">เดินหลังมื้อ</span>
+                    <span className="rounded-full bg-zone-in/12 px-2 py-0.5 text-[0.72rem] text-zone-in-ink">{t('เดินหลังมื้อ', 'walked after')}</span>
                   )}
-                  <button onClick={() => remove(m.id)} aria-label={`ลบมื้อ ${m.label}`}
+                  <button onClick={() => remove(m.id)} aria-label={t(`ลบมื้อ ${m.label}`, `Delete meal ${m.label}`)}
                     className="ml-auto rounded-sm p-2 text-ink-40 transition hover:bg-zone-vhigh/10 hover:text-zone-vhigh-ink">
                     <IconTrash className="h-4 w-4" />
                   </button>
@@ -261,23 +265,23 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                         +{Math.round(r.delta)}
                       </span>
                       <span className="text-ink-40">
-                        {' '}มก./ดล. · สูงสุดใน {r.minutesToPeak} นาที
-                        {r.minutesToBaseline != null ? ` · กลับที่เดิม ${fmtDuration(r.minutesToBaseline)}` : ' · ยังไม่กลับที่เดิมใน 3 ชม.'}
+                        {' '}{t(`มก./ดล. · สูงสุดใน ${r.minutesToPeak} นาที`, `mg/dL · peak in ${r.minutesToPeak} min`)}
+                        {r.minutesToBaseline != null ? t(` · กลับที่เดิม ${fmtDuration(r.minutesToBaseline, locale)}`, ` · back to baseline in ${fmtDuration(r.minutesToBaseline, locale)}`) : t(' · ยังไม่กลับที่เดิมใน 3 ชม.', ' · had not returned to baseline within 3h')}
                       </span>
                     </>
                   ) : (
-                    <span className="text-ink-40">ไม่มีข้อมูลน้ำตาลพอในช่วง 3 ชั่วโมงหลังมื้อนี้</span>
+                    <span className="text-ink-40">{t('ไม่มีข้อมูลน้ำตาลพอในช่วง 3 ชั่วโมงหลังมื้อนี้', 'Not enough glucose data in the 3 hours after this meal')}</span>
                   )}
                 </div>
                 {r && r.checkpoints.some((c) => c.value != null) && (
                   <details className="mt-2 rounded-sm border border-line-soft bg-surface-raised/50">
                     <summary className="cursor-pointer select-none px-3 py-2 text-[0.78rem] font-medium text-ink-70">
-                      ดูค่าที่ 1 / 2 / 3 ชั่วโมงหลังมื้อ
+                      {t('ดูค่าที่ 1 / 2 / 3 ชั่วโมงหลังมื้อ', 'See the 1 / 2 / 3-hour marks after the meal')}
                     </summary>
                     <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-1">
                       {r.checkpoints.map((c) => (
                         <div key={c.minutes} className="num rounded-sm bg-surface-sunken px-2 py-1.5 text-center">
-                          <div className="text-[0.72rem] text-ink-40">{CHECKPOINT_LABEL[c.minutes]}</div>
+                          <div className="text-[0.72rem] text-ink-40">{checkpointLabel(t)[c.minutes]}</div>
                           {c.value != null ? (
                             <>
                               <div className="text-[0.95rem] font-semibold">{c.value}</div>
@@ -286,7 +290,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                               </div>
                             </>
                           ) : (
-                            <div className="mt-1 text-[0.72rem] text-ink-40">ไม่มีข้อมูล</div>
+                            <div className="mt-1 text-[0.72rem] text-ink-40">{t('ไม่มีข้อมูล', 'no data')}</div>
                           )}
                         </div>
                       ))}

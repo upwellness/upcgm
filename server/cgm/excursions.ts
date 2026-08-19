@@ -1,9 +1,10 @@
 import type { MealMarker, Reading } from '@/lib/types';
+import { tx, type Locale } from './i18n';
 import type { Minutes } from '@/lib/time';
 import { fmtThaiDate, fmtTime, minuteOfDay } from '@/lib/time';
 import { mealResponse, POST_MEAL_MINUTES } from '@/lib/meal-response';
 import { NIGHT_END_MIN, NIGHT_START_MIN } from './thresholds';
-import { PATTERNS, classifyMeal, type MealPattern, type PatternKey } from './patterns';
+import { patternDefs, classifyMeal, type MealPattern, type PatternKey } from './patterns';
 
 /**
  * Finds every rise in the whole wear, not just the ones a coach remembered to
@@ -134,6 +135,7 @@ export function buildEvents(
   markers: MealMarker[],
   /** onsets past this are dropped — see the tail note in interpret.ts */
   onsetCutoff?: Minutes,
+  locale: Locale = 'th',
 ): CgmEvent[] {
   const byTime = [...markers].sort((a, b) => a.t - b.t);
   const events: CgmEvent[] = [];
@@ -142,7 +144,7 @@ export function buildEvents(
   const push = (t: Minutes, source: EventSource, marker: MealMarker | null) => {
     const id = marker ? marker.id : `ex-${t}`;
     const resp = mealResponse(id, t, readings);
-    const pattern = classifyMeal(t, resp, readings);
+    const pattern = classifyMeal(t, resp, readings, locale);
     const mod = minuteOfDay(t);
     events.push({
       id,
@@ -192,7 +194,13 @@ export interface EventSnapshot {
 /** At least this many readable events before we call anything a habit. */
 export const MIN_EVENTS_FOR_DOMINANT = 3;
 
-export function summariseEvents(events: CgmEvent[], opts: { medsLowering: boolean }): EventSnapshot {
+export function summariseEvents(
+  events: CgmEvent[],
+  opts: { medsLowering: boolean },
+  locale: Locale = 'th',
+): EventSnapshot {
+  const t = tx(locale);
+  const PATTERNS = patternDefs(locale);
   const counts: Record<PatternKey, number> = { spike: 0, wide: 0, stuck: 0, crash: 0, flat: 0 };
   let judged = 0, thinData = 0, betweenShapes = 0, marked = 0, detected = 0, overnightCount = 0;
 
@@ -214,13 +222,25 @@ export function summariseEvents(events: CgmEvent[], opts: { medsLowering: boolea
 
   let headlineTh: string;
   if (judged === 0) {
-    headlineTh = 'ยังไม่เจอช่วงที่น้ำตาลขึ้นมากพอจะบอกรูปร่างได้ในช่วงเวลานี้';
+    headlineTh = t(
+      'ยังไม่เจอช่วงที่น้ำตาลขึ้นมากพอจะบอกรูปร่างได้ในช่วงเวลานี้',
+      'No rise in this window is big enough to call a shape yet.',
+    );
   } else if (dominant == null) {
     headlineTh = judged < MIN_EVENTS_FOR_DOMINANT
-      ? `เจอ ${judged} ช่วงที่อ่านรูปร่างได้ — ยังน้อยเกินกว่าจะบอกว่าเป็นแพตเทิร์นประจำ`
-      : `เจอ ${judged} ช่วงที่น้ำตาลขึ้น ส่วนใหญ่กลับลงมาที่เดิมได้เอง — ยังไม่มีรูปร่างไหนที่ต้องแก้เป็นพิเศษ`;
+      ? t(
+          `เจอ ${judged} ช่วงที่อ่านรูปร่างได้ — ยังน้อยเกินกว่าจะบอกว่าเป็นแพตเทิร์นประจำ`,
+          `${judged} ${judged === 1 ? 'rise reads' : 'rises read'} clearly — still too few to call it a habit.`,
+        )
+      : t(
+          `เจอ ${judged} ช่วงที่น้ำตาลขึ้น ส่วนใหญ่กลับลงมาที่เดิมได้เอง — ยังไม่มีรูปร่างไหนที่ต้องแก้เป็นพิเศษ`,
+          `${judged} rises found, and most came back to the line on their own — no one shape stands out as needing work.`,
+        );
   } else {
-    headlineTh = `สแกนทั้งช่วงแล้วเจอ ${judged} ครั้งที่น้ำตาลขึ้น — รูปร่างที่เจอบ่อยที่สุดคือ “${PATTERNS[dominant].labelTh}” (${counts[dominant]} ครั้ง) ${PATTERNS[dominant].meaningTh}`;
+    headlineTh = t(
+      `สแกนทั้งช่วงแล้วเจอ ${judged} ครั้งที่น้ำตาลขึ้น — รูปร่างที่เจอบ่อยที่สุดคือ “${PATTERNS[dominant].labelTh}” (${counts[dominant]} ครั้ง) ${PATTERNS[dominant].meaningTh}`,
+      `Scanning the whole wear found ${judged} rises — the shape that comes up most is “${PATTERNS[dominant].labelTh}” (${counts[dominant]} of them). ${PATTERNS[dominant].meaningTh}`,
+    );
   }
 
   return {
@@ -237,7 +257,8 @@ export function analyseEvents(
   readings: Reading[],
   markers: MealMarker[],
   opts: { medsLowering: boolean; onsetCutoff?: Minutes },
+  locale: Locale = 'th',
 ): { events: CgmEvent[]; snapshot: EventSnapshot } {
-  const events = buildEvents(readings, markers, opts.onsetCutoff);
-  return { events, snapshot: summariseEvents(events, opts) };
+  const events = buildEvents(readings, markers, opts.onsetCutoff, locale);
+  return { events, snapshot: summariseEvents(events, opts, locale) };
 }

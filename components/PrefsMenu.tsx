@@ -68,8 +68,8 @@ export default function PrefsMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={t('prefs.open')}
-        title={t('prefs.open')}
+        aria-label={t('ตั้งค่าการแสดงผล', 'Display settings')}
+        title={t('ตั้งค่าการแสดงผล', 'Display settings')}
         className="grid h-10 w-10 place-items-center rounded-sm border border-line bg-surface-raised text-ink-70 shadow-sm transition-colors hover:text-ink"
       >
         <svg viewBox="0 0 24 24" className="h-[1.15rem] w-[1.15rem]" fill="none" stroke="currentColor"
@@ -82,37 +82,37 @@ export default function PrefsMenu() {
       {open && (
         <div
           role="dialog"
-          aria-label={t('prefs.title')}
+          aria-label={t('ตั้งค่าการแสดงผล', 'Display settings')}
           className="absolute right-0 z-40 mt-2 w-[17.5rem] rounded-md border border-line bg-surface-raised p-4 shadow-lg"
         >
-          <div className="mb-3 font-head text-[0.95rem] font-semibold">{t('prefs.title')}</div>
+          <div className="mb-3 font-head text-[0.95rem] font-semibold">{t('ตั้งค่าการแสดงผล', 'Display settings')}</div>
 
           <div className="space-y-3.5">
             <Segmented<Locale>
-              label={t('prefs.language')}
+              label={t('ภาษา', 'Language')}
               value={prefs.locale}
               onChange={setLocale}
               options={[{ v: 'th', label: 'ไทย' }, { v: 'en', label: 'English' }]}
             />
 
             <Segmented<Theme>
-              label={t('prefs.theme')}
+              label={t('ธีม', 'Theme')}
               value={prefs.theme}
               onChange={setTheme}
               options={[
-                { v: 'system', label: t('prefs.theme.system') },
-                { v: 'light', label: t('prefs.theme.light') },
-                { v: 'dark', label: t('prefs.theme.dark') },
+                { v: 'system', label: t('ตามระบบ', 'System') },
+                { v: 'light', label: t('สว่าง', 'Light') },
+                { v: 'dark', label: t('มืด', 'Dark') },
               ]}
             />
 
             <div>
-              <div className="mb-1.5 text-[0.8rem] font-medium text-ink-70">{t('prefs.textSize')}</div>
+              <div className="mb-1.5 text-[0.8rem] font-medium text-ink-70">{t('ขนาดตัวอักษร', 'Text size')}</div>
               <div className="flex items-center gap-1 rounded-sm bg-surface-sunken p-1">
                 <button
                   type="button" disabled={atMin}
                   onClick={() => setFontScale(FONT_STEPS[Math.max(0, step - 1)])}
-                  aria-label={t('prefs.textSize.smaller')} title={t('prefs.textSize.smaller')}
+                  aria-label={t('เล็กลง', 'Smaller')} title={t('เล็กลง', 'Smaller')}
                   className="grid h-8 w-9 place-items-center rounded-xs bg-surface-raised text-[0.8rem] font-semibold shadow-sm disabled:opacity-35"
                 >A</button>
                 <div className="flex flex-1 justify-center gap-1" aria-hidden="true">
@@ -123,14 +123,14 @@ export default function PrefsMenu() {
                 <button
                   type="button" disabled={atMax}
                   onClick={() => setFontScale(FONT_STEPS[Math.min(FONT_STEPS.length - 1, step + 1)])}
-                  aria-label={t('prefs.textSize.larger')} title={t('prefs.textSize.larger')}
+                  aria-label={t('ใหญ่ขึ้น', 'Larger')} title={t('ใหญ่ขึ้น', 'Larger')}
                   className="grid h-8 w-9 place-items-center rounded-xs bg-surface-raised text-[1.05rem] font-semibold shadow-sm disabled:opacity-35"
                 >A</button>
               </div>
               <button
                 type="button" onClick={() => setFontScale(1)}
                 className="mt-1.5 text-[0.78rem] text-ink-40 underline underline-offset-2 hover:text-ink-70"
-              >{t('prefs.textSize.reset')}</button>
+              >{t('ขนาดมาตรฐาน', 'Reset to default')}</button>
             </div>
 
             {/* Shows the chosen size at the size a real reading is printed in. */}
@@ -140,7 +140,7 @@ export default function PrefsMenu() {
             </div>
           </div>
 
-          <p className="mt-3 text-[0.75rem] leading-relaxed text-ink-40">{t('prefs.note')}</p>
+          <p className="mt-3 text-[0.75rem] leading-relaxed text-ink-40">{t('ค่าที่ตั้งไว้จะถูกจำในเครื่องนี้ ไม่ได้ส่งออกไปไหน', 'These settings are remembered on this device and are not sent anywhere.')}</p>
         </div>
       )}
     </div>
