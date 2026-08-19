@@ -19,8 +19,9 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
       form.append('file', file);
       const res = await fetch('/api/analyse', { method: 'POST', body: form });
       if (res.status === 401) {
-        // The 12-hour session expired while the tab sat open.
-        window.location.href = '/gate';
+        // Only reachable if the passcode gate is switched back on in
+        // middleware.ts and the session expired while the tab sat open.
+        setError('เซสชันหมดอายุ — โหลดหน้านี้ใหม่อีกครั้ง');
         return;
       }
       const json = (await res.json().catch(() => ({}))) as Partial<AnalysisResult> & { messageTh?: string };

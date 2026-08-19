@@ -1,9 +1,14 @@
 import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
 import GateForm from '@/components/GateForm';
+
+/** Mirrors GATE_ENABLED in middleware.ts — flip both together. */
+const GATE_ENABLED = false;
 
 export const metadata = { title: 'เข้าใช้งาน · CGM Analyser' };
 
 export default function GatePage() {
+  if (!GATE_ENABLED) redirect('/');
   return (
     <main className="min-h-dvh grid place-items-center px-5 py-12">
       <div className="w-full max-w-[26rem]">
