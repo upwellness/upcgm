@@ -21,7 +21,7 @@ export interface MealPatternView {
 
 /** Same house cutoff used for the headline delta — kept in one place so the
  * per-checkpoint colors below always agree with it. */
-const deltaColor = (d: number) => (d > 60 ? '#946516' : '#367C4F');
+const deltaColor = (d: number) => (d > 60 ? 'rgb(var(--c-zone-high-ink))' : 'rgb(var(--c-zone-in-ink))');
 
 const PATTERN_LABEL: Record<PatternKey, string> = {
   spike: 'พุ่ง', wide: 'กว้าง', stuck: 'ค้าง', crash: 'ตก', flat: 'เรียบ',
@@ -122,15 +122,15 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
         </span>
         <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
           <button onClick={startNew}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-olive px-3 py-2 text-[0.85rem] font-medium text-white transition hover:bg-olive-dark sm:flex-none">
+            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent px-3 py-2 text-[0.85rem] font-medium text-accent-ink transition hover:bg-accent-dark sm:flex-none">
             <IconPlus className="h-3.5 w-3.5" /> เพิ่มมื้อ
           </button>
           <button onClick={download} disabled={markers.length === 0}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-white disabled:opacity-40 sm:flex-none">
+            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-surface-raised disabled:opacity-40 sm:flex-none">
             <IconDownload className="h-3.5 w-3.5" /> บันทึกเป็นไฟล์
           </button>
           <button onClick={() => fileRef.current?.click()}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-white sm:flex-none">
+            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-3 py-2 text-[0.85rem] transition hover:bg-surface-raised sm:flex-none">
             <IconUpload className="h-3.5 w-3.5" /> โหลดจากไฟล์
           </button>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden"
@@ -158,14 +158,14 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
       )}
 
       {draft && (
-        <div className="mt-4 rounded-md border border-olive/25 bg-white/70 p-4">
+        <div className="mt-4 rounded-md border border-olive/25 bg-surface-raised/70 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-[0.83rem] font-medium">ชื่อมื้อ</span>
               <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })}
                 placeholder="เช่น ข้าวมันไก่ / ก๋วยเตี๋ยวต้มยำ"
                 maxLength={60} autoFocus
-                className="mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
+                className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
               <span className="text-[0.83rem] font-medium">เวลาที่เริ่มกิน</span>
@@ -174,12 +174,12 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                   const t = fromLocalInputValue(e.target.value);
                   if (t != null) setDraft({ ...draft, t });
                 }}
-                className="num mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
+                className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
               <span className="text-[0.83rem] font-medium">ประเภท</span>
               <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as MealMarker['kind'] })}
-                className="mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
+                className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
                 {MEAL_KINDS.map((k) => <option key={k.key} value={k.key}>{k.glyph} {k.labelTh}</option>)}
               </select>
             </label>
@@ -187,7 +187,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
               <span className="text-[0.83rem] font-medium">ลำดับการกิน</span>
               <select value={draft.eatingOrder ?? 'unknown'}
                 onChange={(e) => setDraft({ ...draft, eatingOrder: e.target.value as MealMarker['eatingOrder'] })}
-                className="mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
+                className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
                 <option value="unknown">ไม่ได้สังเกต</option>
                 <option value="veg-first">กินผัก/โปรตีนก่อนคาร์บ</option>
                 <option value="carb-first">กินคาร์บก่อน</option>
@@ -202,11 +202,11 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
           </label>
           <div className="mt-4 flex gap-2">
             <button onClick={commit}
-              className="min-h-[2.75rem] flex-1 rounded-sm bg-olive px-4 py-2 text-[0.88rem] sm:flex-none font-medium text-white transition hover:bg-olive-dark">
+              className="min-h-[2.75rem] flex-1 rounded-sm bg-accent px-4 py-2 text-[0.88rem] sm:flex-none font-medium text-accent-ink transition hover:bg-accent-dark">
               บันทึกมื้อนี้
             </button>
             <button onClick={() => { setDraft(null); setNotice(null); }}
-              className="min-h-[2.75rem] flex-1 rounded-sm border border-line px-4 py-2 text-[0.88rem] sm:flex-none transition hover:bg-white">
+              className="min-h-[2.75rem] flex-1 rounded-sm border border-line px-4 py-2 text-[0.88rem] sm:flex-none transition hover:bg-surface-raised">
               ยกเลิก
             </button>
           </div>
@@ -270,7 +270,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
                   )}
                 </div>
                 {r && r.checkpoints.some((c) => c.value != null) && (
-                  <details className="mt-2 rounded-sm border border-line-soft bg-white/50">
+                  <details className="mt-2 rounded-sm border border-line-soft bg-surface-raised/50">
                     <summary className="cursor-pointer select-none px-3 py-2 text-[0.78rem] font-medium text-ink-70">
                       ดูค่าที่ 1 / 2 / 3 ชั่วโมงหลังมื้อ
                     </summary>

@@ -16,6 +16,7 @@ import MealPanel, { type MealPatternView } from './MealPanel';
 import { MetricGrid, RangeBar, SpanStrip } from './Metrics';
 import EventExplorer, { type CgmEventView, type EventSnapshotView } from './EventExplorer';
 import PatternPanel, { type PatternSnapshotView } from './PatternPanel';
+import PrefsMenu from './PrefsMenu';
 import Uploader from './Uploader';
 
 interface AiResponse {
@@ -130,7 +131,14 @@ export default function Dashboard() {
   }, [result, activeWindow, meds, markers, responses, readings, narrativeNonce, aiOn, aiCfg.apiKey, aiCfg.model]);
 
   if (!result) {
-    return <Uploader onResult={setResult} />;
+    return (
+      <>
+        <div className="mx-auto flex max-w-6xl justify-end px-4 pt-4 sm:px-6">
+          <PrefsMenu />
+        </div>
+        <Uploader onResult={setResult} />
+      </>
+    );
   }
 
   const w = activeWindow;
@@ -147,6 +155,7 @@ export default function Dashboard() {
             <span className="num">{fmtThaiDate(result.metrics.firstT)} – {fmtThaiDate(result.metrics.lastT, { year: true })}</span>
           </p>
         </div>
+        <PrefsMenu />
         {/* Desktop keeps the actions in the header. On a phone they move to a
             sticky bar at the bottom, within thumb reach and always visible after
             a long scroll through the findings. */}
@@ -160,14 +169,14 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => { setResult(null); setAi(null); setMeds(null); }}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-white/70 px-3.5 py-2.5 text-[0.86rem] transition hover:bg-white"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface-raised/70 px-3.5 py-2.5 text-[0.86rem] transition hover:bg-surface-raised"
           >
             <IconUpload className="h-4 w-4" /> เปลี่ยนไฟล์
           </button>
           <Link
             href="/config"
             title={aiOn ? 'ตั้งค่า · เปิดใช้สรุปด้วย AI อยู่' : 'ตั้งค่า · ยังไม่ได้เปิดใช้ AI'}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-white/70 px-3 py-2.5 text-[0.86rem] transition hover:bg-white"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-line bg-surface-raised/70 px-3 py-2.5 text-[0.86rem] transition hover:bg-surface-raised"
           >
             ตั้งค่า
             {aiOn && <span className="h-1.5 w-1.5 rounded-full bg-zone-in" aria-label="เปิดใช้ AI อยู่" />}
@@ -258,14 +267,14 @@ export default function Dashboard() {
                       <button
                         onClick={() => setNarrativeNonce((n) => n + 1)}
                         disabled={aiBusy}
-                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-olive/40 bg-white/70 px-3 py-1.5 text-[0.82rem] font-medium text-olive transition hover:bg-white disabled:opacity-40"
+                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-olive/40 bg-surface-raised/70 px-3 py-1.5 text-[0.82rem] font-medium text-olive transition hover:bg-surface-raised disabled:opacity-40"
                       >
                         <IconSparkle className="h-3.5 w-3.5" />
                         {narrativeNonce > 0 ? 'สรุปใหม่ด้วย AI' : 'สรุปด้วย AI'}
                       </button>
                     ) : (
                       <Link href="/config"
-                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-line bg-white/60 px-3 py-1.5 text-[0.8rem] text-ink-40 transition hover:bg-white">
+                        className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-sm border border-line bg-surface-raised/60 px-3 py-1.5 text-[0.8rem] text-ink-40 transition hover:bg-surface-raised">
                         เปิดใช้สรุปด้วย AI →
                       </Link>
                     )}
@@ -287,7 +296,7 @@ export default function Dashboard() {
                 {interp && <Findings findings={interp.findings} />}
 
                 {interp && interp.limitationsTh.length > 0 && (
-                  <div className="mt-4 rounded-md border border-line bg-white/50 p-4">
+                  <div className="mt-4 rounded-md border border-line bg-surface-raised/50 p-4">
                     <h3 className="text-[0.85rem] font-medium text-ink-70">ข้อจำกัดที่ต้องบอกเคส</h3>
                     <ul className="mt-1.5 space-y-1">
                       {interp.limitationsTh.map((l, i) => (
@@ -332,7 +341,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => { setResult(null); setAi(null); setMeds(null); }}
                   aria-label="เปลี่ยนไฟล์"
-                  className="inline-flex items-center justify-center rounded-sm border border-line bg-white/80 px-4 py-3"
+                  className="inline-flex items-center justify-center rounded-sm border border-line bg-surface-raised/80 px-4 py-3"
                 >
                   <IconUpload className="h-4 w-4" />
                 </button>
@@ -375,15 +384,15 @@ function MedsQuestion({ onAnswer }: { onAnswer: (m: GlucoseLoweringMeds) => void
       </p>
       <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
         <button onClick={() => onAnswer('yes')}
-          className="min-h-[3rem] rounded-sm bg-olive px-4 py-3 text-[0.92rem] font-medium text-white transition hover:bg-olive-dark">
+          className="min-h-[3rem] rounded-sm bg-accent px-4 py-3 text-[0.92rem] font-medium text-accent-ink transition hover:bg-accent-dark">
           ใช้อยู่
         </button>
         <button onClick={() => onAnswer('no')}
-          className="min-h-[3rem] rounded-sm border border-line bg-white/80 px-4 py-3 text-[0.92rem] transition hover:bg-white">
+          className="min-h-[3rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-3 text-[0.92rem] transition hover:bg-surface-raised">
           ไม่ใช้
         </button>
         <button onClick={() => onAnswer('unknown')}
-          className="min-h-[3rem] rounded-sm border border-line bg-white/80 px-4 py-3 text-[0.92rem] transition hover:bg-white">
+          className="min-h-[3rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-3 text-[0.92rem] transition hover:bg-surface-raised">
           ยังไม่ทราบ
         </button>
       </div>
@@ -453,8 +462,8 @@ function RangePicker({
             aria-pressed={activeKey === w.key}
             className={`num min-h-[2.6rem] rounded-full px-3.5 py-2 text-[0.85rem] transition ${
               activeKey === w.key
-                ? 'bg-olive text-white shadow-sm'
-                : 'border border-line bg-white/70 text-ink-70 hover:bg-white'
+                ? 'bg-accent text-accent-ink shadow-sm'
+                : 'border border-line bg-surface-raised/70 text-ink-70 hover:bg-surface-raised'
             }`}
           >
             {w.labelTh.replace('ล่าสุด', '')}
@@ -465,7 +474,7 @@ function RangePicker({
           onClick={() => setOpen((v) => !v)}
           aria-pressed={activeKey === '__custom'}
           className={`inline-flex min-h-[2.6rem] items-center gap-1.5 rounded-full px-3.5 py-2 text-[0.85rem] transition ${
-            activeKey === '__custom' ? 'bg-olive text-white shadow-sm' : 'border border-line bg-white/70 text-ink-70 hover:bg-white'
+            activeKey === '__custom' ? 'bg-accent text-accent-ink shadow-sm' : 'border border-line bg-surface-raised/70 text-ink-70 hover:bg-surface-raised'
           }`}
         >
           <IconCalendar className="h-3.5 w-3.5" />
@@ -485,22 +494,22 @@ function RangePicker({
             <label className="block">
               <span className="text-[0.83rem] font-medium">ตั้งแต่</span>
               <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="num mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+                className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
             </label>
             <label className="block">
               <span className="text-[0.83rem] font-medium">ถึง</span>
               <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)}
-                className="num mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+                className="num mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
             </label>
           </div>
           {err && <p role="alert" className="mt-2 text-[0.83rem] text-zone-vhigh-ink">{err}</p>}
           <div className="mt-3 flex gap-2">
             <button onClick={apply}
-              className="rounded-sm bg-olive px-4 py-2 text-[0.87rem] font-medium text-white transition hover:bg-olive-dark">
+              className="rounded-sm bg-accent px-4 py-2 text-[0.87rem] font-medium text-accent-ink transition hover:bg-accent-dark">
               ดูช่วงนี้
             </button>
             <button onClick={() => setOpen(false)}
-              className="rounded-sm border border-line px-4 py-2 text-[0.87rem] transition hover:bg-white">
+              className="rounded-sm border border-line px-4 py-2 text-[0.87rem] transition hover:bg-surface-raised">
               ยกเลิก
             </button>
           </div>

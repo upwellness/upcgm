@@ -113,7 +113,7 @@ export default function EventExplorer({
           <div className="mt-4 flex flex-wrap gap-2">
             <button onClick={() => setFilter('all')}
               className={`min-h-[2.25rem] rounded-full px-3 py-1 text-[0.82rem] font-medium transition ${
-                filter === 'all' ? 'bg-olive text-white' : 'bg-surface-sunken text-ink-70 hover:bg-white'}`}>
+                filter === 'all' ? 'bg-accent text-accent-ink' : 'bg-surface-sunken text-ink-70 hover:bg-surface-raised'}`}>
               ทั้งหมด {snap.judged}
             </button>
             {ORDER.filter((k) => (snap.counts[k] ?? 0) > 0).map((k) => {
@@ -148,7 +148,7 @@ export default function EventExplorer({
                   <button
                     onClick={() => setOpenId(isOpen ? null : e.id)}
                     aria-expanded={isOpen}
-                    className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-1 py-3 text-left transition hover:bg-white/50"
+                    className="flex w-full flex-wrap items-center gap-x-2.5 gap-y-1 py-3 text-left transition hover:bg-surface-raised/50"
                   >
                     {e.pattern.primary && <PatternChip k={e.pattern.primary} size="sm" />}
                     <span className="num text-[0.85rem] font-medium">{e.whenTh}</span>
@@ -160,7 +160,7 @@ export default function EventExplorer({
                       <span className="rounded-full bg-zone-low/12 px-2 py-0.5 text-[0.68rem] text-zone-low-ink">กลางคืน</span>
                     )}
                     <span className="num ml-auto text-[0.85rem] font-semibold"
-                      style={{ color: (m.delta ?? 0) > 60 ? '#946516' : '#367C4F' }}>
+                      style={{ color: (m.delta ?? 0) > 60 ? 'rgb(var(--c-zone-high-ink))' : 'rgb(var(--c-zone-in-ink))' }}>
                       +{Math.round(m.delta ?? 0)}
                     </span>
                     <span className="text-[0.78rem] text-ink-40">{isOpen ? 'ย่อ ▲' : 'ดูกราฟ ▼'}</span>
@@ -168,7 +168,7 @@ export default function EventExplorer({
 
                   {isOpen && open && (
                     <div className="pb-4">
-                      <div className="rounded-md border border-line-soft bg-white/60 p-2">
+                      <div className="rounded-md border border-line-soft bg-surface-raised/60 p-2">
                         <GlucoseChart
                           t={focusReadings.map((r) => r.t)}
                           v={focusReadings.map((r) => r.v)}

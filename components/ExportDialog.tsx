@@ -108,26 +108,26 @@ export default function ExportDialog(props: Props) {
             <span className="text-[0.8rem] font-medium">ชื่อเรียกของเคส (ไม่จำเป็น)</span>
             <input value={clientName} onChange={(e) => setClientName(e.target.value)} maxLength={40}
               placeholder="เช่น พี่แดง"
-              className="mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+              className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
           </label>
           <label className="min-w-[14rem] flex-[2]">
             <span className="text-[0.8rem] font-medium">บันทึกจากโค้ช (ไม่จำเป็น)</span>
             <input value={coachNote} onChange={(e) => setCoachNote(e.target.value)} maxLength={200}
               placeholder="เช่น อาทิตย์หน้าลองเดินหลังมื้อเย็น 15 นาที แล้วส่งไฟล์ใหม่มาดูกัน"
-              className="mt-1 w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
+              className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.9rem] outline-none focus:border-olive" />
           </label>
           <div className="flex w-full gap-2 sm:w-auto">
             <button onClick={savePng} disabled={busy}
-              className="inline-flex min-h-[2.9rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-olive px-4 py-2.5 text-[0.88rem] font-medium text-white transition hover:bg-olive-dark disabled:opacity-50 sm:flex-none">
+              className="inline-flex min-h-[2.9rem] flex-1 items-center justify-center gap-1.5 rounded-sm bg-accent px-4 py-2.5 text-[0.88rem] font-medium text-accent-ink transition hover:bg-accent-dark disabled:opacity-50 sm:flex-none">
               <IconImage className="h-4 w-4" />
               {busy ? 'กำลังสร้างรูป…' : 'บันทึกเป็นรูป'}
             </button>
             <button onClick={() => window.print()}
-              className="min-h-[2.9rem] rounded-sm border border-line bg-white/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-white">
+              className="min-h-[2.9rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-surface-raised">
               สั่งพิมพ์
             </button>
             <button onClick={onClose}
-              className="min-h-[2.9rem] rounded-sm border border-line bg-white/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-white">
+              className="min-h-[2.9rem] rounded-sm border border-line bg-surface-raised/80 px-4 py-2.5 text-[0.88rem] transition hover:bg-surface-raised">
               ปิด
             </button>
           </div>

@@ -13,7 +13,7 @@ export default function GatePage() {
     <main className="min-h-dvh grid place-items-center px-5 py-12">
       <div className="w-full max-w-[26rem]">
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-olive text-white shadow-md">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-accent-ink shadow-md">
             <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 14h3.5l2-5 3 10 2.5-7 1.8 4H21" />
             </svg>

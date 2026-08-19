@@ -61,7 +61,7 @@ export default function GateForm() {
         required
         aria-describedby={error ? 'gate-error' : undefined}
         aria-invalid={error ? true : undefined}
-        className="num mt-3 w-full rounded-sm border border-line bg-white/85 px-4 py-3 text-[1.05rem] tracking-[0.14em] outline-none placeholder:tracking-normal placeholder:text-ink-40 focus:border-olive"
+        className="num mt-3 w-full rounded-sm border border-line bg-surface-raised/85 px-4 py-3 text-[1.05rem] tracking-[0.14em] outline-none placeholder:tracking-normal placeholder:text-ink-40 focus:border-olive"
         placeholder="กรอกรหัสที่ได้รับ"
       />
       {error && (
@@ -72,7 +72,7 @@ export default function GateForm() {
       <button
         type="submit"
         disabled={busy || !code.trim()}
-        className="mt-5 w-full rounded-sm bg-olive px-4 py-3 font-head text-[1rem] font-medium text-white shadow-sm transition hover:bg-olive-dark disabled:cursor-not-allowed disabled:opacity-45"
+        className="mt-5 w-full rounded-sm bg-accent px-4 py-3 font-head text-[1rem] font-medium text-accent-ink shadow-sm transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-45"
       >
         {busy ? 'กำลังตรวจรหัส…' : 'เข้าใช้งาน'}
       </button>

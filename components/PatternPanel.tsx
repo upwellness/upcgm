@@ -100,7 +100,7 @@ export default function PatternPanel({ snap }: { snap: PatternSnapshotView }) {
           )}
 
           {snap.examples.length > 0 && (
-            <details className="mt-3 rounded-sm border border-line-soft bg-white/50">
+            <details className="mt-3 rounded-sm border border-line-soft bg-surface-raised/50">
               <summary className="cursor-pointer select-none px-3 py-2 text-[0.8rem] font-medium text-ink-70">
                 ดูมื้อตัวอย่างที่เข้าเกณฑ์ ({snap.examples.length} มื้อ)
               </summary>

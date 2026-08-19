@@ -9,7 +9,7 @@ export default function Error({ reset }: { error: Error; reset: () => void }) {
           ข้อมูลที่อ่านไว้ยังอยู่ในเครื่อง ลองกดโหลดใหม่ ถ้ายังไม่หายให้ส่งไฟล์เข้ามาอีกครั้ง
         </p>
         <button onClick={reset}
-          className="mt-5 rounded-sm bg-olive px-5 py-3 text-[0.92rem] font-medium text-white transition hover:bg-olive-dark">
+          className="mt-5 rounded-sm bg-accent px-5 py-3 text-[0.92rem] font-medium text-accent-ink transition hover:bg-accent-dark">
           ลองอีกครั้ง
         </button>
       </div>

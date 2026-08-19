@@ -35,7 +35,7 @@ export function RangeBar({ m, showPercents }: { m: Metrics; showPercents: boolea
               title={`${p.band.labelTh} · ${pc(p.pct)}`}
             >
               {p.pct >= 7 && showPercents && (
-                <span className="num px-1 text-[0.7rem] font-semibold text-white/95">{barLabel(p.pct)}</span>
+                <span className="num px-1 text-[0.7rem] font-semibold text-accent-ink/95">{barLabel(p.pct)}</span>
               )}
             </div>
           )

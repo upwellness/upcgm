@@ -147,19 +147,19 @@ export default function GlucoseChart({
               strokeWidth={g === 70 || g === 180 ? 1.1 : 0.8}
               strokeDasharray={g === 140 ? '4 4' : undefined}
             />
-            <text x={PAD.left - 7} y={y(g) + 3.5} textAnchor="end" fontSize={narrow ? 10 : 10.5} fill="#68695F" className="num">{g}</text>
+            <text x={PAD.left - 7} y={y(g) + 3.5} textAnchor="end" fontSize={narrow ? 10 : 10.5} fill="rgb(var(--c-ink-70))" className="num">{g}</text>
           </g>
         ))}
 
         {ticks.map((tk) => (
           <g key={tk.t}>
             <line x1={x(tk.t)} x2={x(tk.t)} y1={PAD.top} y2={PAD.top + plotH} stroke="rgba(42,46,34,.07)" strokeWidth="0.8" />
-            <text x={x(tk.t)} y={H - 8} textAnchor="middle" fontSize={narrow ? 10 : 10.5} fill="#68695F">{tk.label}</text>
+            <text x={x(tk.t)} y={H - 8} textAnchor="middle" fontSize={narrow ? 10 : 10.5} fill="rgb(var(--c-ink-70))">{tk.label}</text>
           </g>
         ))}
 
         {segments.map((d, i) => (
-          <path key={i} d={d} fill="none" stroke="#2E4420" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          <path key={i} d={d} fill="none" stroke="rgb(var(--c-olive-dark))" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
         ))}
 
         {points.map((p) => (
@@ -167,7 +167,7 @@ export default function GlucoseChart({
             key={`${p.i}-${p.flag}`}
             cx={p.cx} cy={p.cy} r={2.6}
             fill="none"
-            stroke={p.flag === 'censored' ? bandOf(p.v).fill : '#86877E'}
+            stroke={p.flag === 'censored' ? bandOf(p.v).fill : 'rgb(var(--c-ink-40))'}
             strokeWidth="1.4"
             strokeDasharray={p.flag === 'censored' ? undefined : '2 1.6'}
           />
@@ -177,7 +177,7 @@ export default function GlucoseChart({
           <path
             key={i}
             d={o.above ? `M${o.cx - 4},${PAD.top + 5} L${o.cx},${PAD.top} L${o.cx + 4},${PAD.top + 5}` : `M${o.cx - 4},${PAD.top + plotH - 5} L${o.cx},${PAD.top + plotH} L${o.cx + 4},${PAD.top + plotH - 5}`}
-            fill="none" stroke={o.above ? '#B4472F' : '#2F5D73'} strokeWidth="1.6" strokeLinecap="round"
+            fill="none" stroke={o.above ? 'rgb(var(--c-zone-vhigh))' : 'rgb(var(--c-zone-vlow))'} strokeWidth="1.6" strokeLinecap="round"
           />
         ))}
 
@@ -194,9 +194,9 @@ export default function GlucoseChart({
                   role={staticMode ? undefined : 'button'}
                   aria-label={staticMode ? undefined : `มื้อ ${mk.label} เวลา ${fmtTime(mk.t)}`}
                 >
-                  <line x1={x(mk.t)} x2={x(mk.t)} y1={PAD.top} y2={laneY} stroke="#876920" strokeWidth="1" strokeDasharray="3 3" />
-                  <circle cx={x(mk.t)} cy={laneY + 7} r={narrow ? 8 : 6} fill="#C99D2F" />
-                  <text x={x(mk.t)} y={laneY + 10.5} textAnchor="middle" fontSize={narrow ? 9.5 : 8} fill="#2A2E22" fontWeight="600">
+                  <line x1={x(mk.t)} x2={x(mk.t)} y1={PAD.top} y2={laneY} stroke="rgb(var(--c-gold-ink))" strokeWidth="1" strokeDasharray="3 3" />
+                  <circle cx={x(mk.t)} cy={laneY + 7} r={narrow ? 8 : 6} fill="rgb(var(--c-gold))" />
+                  <text x={x(mk.t)} y={laneY + 10.5} textAnchor="middle" fontSize={narrow ? 9.5 : 8} fill="rgb(var(--c-ink))" fontWeight="600">
                     {mk.label.slice(0, 1)}
                   </text>
                 </g>
@@ -214,7 +214,7 @@ export default function GlucoseChart({
 
       {hover && hv && (
         <div
-          className="pointer-events-none absolute top-1 -translate-x-1/2 rounded-sm bg-ink/92 px-2.5 py-1.5 text-[0.76rem] leading-tight text-white shadow-md"
+          className="pointer-events-none absolute top-1 -translate-x-1/2 rounded-sm bg-tooltip/95 px-2.5 py-1.5 text-[0.76rem] leading-tight text-accent-ink shadow-md"
           style={{ left: `${tipLeft}%` }}
         >
           <div className="num font-semibold">{hv.v} มก./ดล.</div>

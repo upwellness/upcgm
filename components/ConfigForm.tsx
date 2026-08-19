@@ -83,10 +83,10 @@ export default function ConfigForm() {
               onChange={(e) => persist({ ...cfg, apiKey: e.target.value })}
               placeholder="วางคีย์จาก Google AI Studio"
               autoComplete="off" spellCheck={false}
-              className="num min-h-[2.75rem] w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive"
+              className="num min-h-[2.75rem] w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive"
             />
             <button onClick={() => setReveal((v) => !v)} type="button"
-              className="min-h-[2.75rem] shrink-0 rounded-sm border border-line px-3 text-[0.82rem] transition hover:bg-white">
+              className="min-h-[2.75rem] shrink-0 rounded-sm border border-line px-3 text-[0.82rem] transition hover:bg-surface-raised">
               {reveal ? 'ซ่อน' : 'ดู'}
             </button>
           </div>
@@ -99,13 +99,13 @@ export default function ConfigForm() {
           <span className="text-[0.85rem] font-medium">โมเดล</span>
           {models && models.length > 0 ? (
             <select value={cfg.model} onChange={(e) => persist({ ...cfg, model: e.target.value })}
-              className="mt-1 min-h-[2.75rem] w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
+              className="mt-1 min-h-[2.75rem] w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
               {models.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.id}</option>)}
             </select>
           ) : (
             <input value={cfg.model} onChange={(e) => persist({ ...cfg, model: e.target.value })}
               placeholder={DEFAULT_MODEL} autoComplete="off" spellCheck={false}
-              className="num mt-1 min-h-[2.75rem] w-full rounded-sm border border-line bg-white px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
+              className="num mt-1 min-h-[2.75rem] w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive" />
           )}
           <span className="mt-1 block text-[0.78rem] leading-relaxed text-ink-40">
             กด “ตรวจคีย์” แล้วระบบจะดึงรายชื่อโมเดลที่คีย์นี้เรียกได้จริงมาให้เลือก —
@@ -126,12 +126,12 @@ export default function ConfigForm() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={testKey} disabled={busy || cfg.apiKey.trim().length < 10}
-            className="min-h-[2.75rem] flex-1 rounded-sm bg-olive px-4 py-2 text-[0.88rem] font-medium text-white transition hover:bg-olive-dark disabled:opacity-40 sm:flex-none">
+            className="min-h-[2.75rem] flex-1 rounded-sm bg-accent px-4 py-2 text-[0.88rem] font-medium text-accent-ink transition hover:bg-accent-dark disabled:opacity-40 sm:flex-none">
             {busy ? 'กำลังตรวจ…' : 'ตรวจคีย์ + ดึงรายชื่อโมเดล'}
           </button>
           <button onClick={() => { clearAiConfig(); setCfg(EMPTY); setModels(null); setMsg({ tone: 'ok', text: 'ลบคีย์ออกจากเครื่องนี้แล้ว' }); }}
             disabled={!cfg.apiKey}
-            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-4 py-2 text-[0.88rem] transition hover:bg-white disabled:opacity-40 sm:flex-none">
+            className="inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-sm border border-line px-4 py-2 text-[0.88rem] transition hover:bg-surface-raised disabled:opacity-40 sm:flex-none">
             <IconTrash className="h-3.5 w-3.5" /> ลบคีย์
           </button>
         </div>

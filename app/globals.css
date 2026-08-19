@@ -2,16 +2,179 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
+/* ── Palette ───────────────────────────────────────────────────────────────
+   Light is the default and lives on bare :root so no colour is ever defined
+   only inside a media query. Dark is applied twice on purpose: once for people
+   whose system asks for it (guarded so an explicit "light" choice still wins),
+   and once for the explicit [data-theme="dark"] choice, so the toggle beats the
+   system in both directions.
+   Values are space-separated RGB triples because Tailwind composes them with
+   <alpha-value>; the two line colours carry their own alpha and stay whole. */
+:root {
+  color-scheme: light;
+
+  --c-surface: 247 244 238;
+  --c-surface-raised: 255 255 255;
+  --c-surface-sunken: 239 234 224;
+
+  --c-ink: 42 46 34;
+  --c-ink-70: 104 105 95;
+  --c-ink-40: 134 135 126;
+
+  --c-line: rgba(42, 46, 34, .12);
+  --c-line-soft: rgba(42, 46, 34, .07);
+
+  --c-olive: 61 88 38;
+  --c-olive-light: 92 122 63;
+  --c-olive-dark: 46 68 32;
+
+  --c-gold: 201 157 47;
+  --c-gold-ink: 135 105 32;
+
+  --c-zone-in: 62 142 90;        --c-zone-in-ink: 54 124 79;
+  --c-zone-high: 201 138 30;     --c-zone-high-ink: 148 101 22;
+  --c-zone-vhigh: 180 71 47;     --c-zone-vhigh-ink: 180 71 47;
+  --c-zone-low: 58 110 134;      --c-zone-low-ink: 58 110 134;
+
+  --c-zone-vlow: 47 93 115;
+  --c-pattern-wide: 176 132 35;
+  --c-note: 154 118 32;
+
+  --c-accent: 61 88 38;
+  --c-on-accent: 255 255 255;
+  --c-tooltip: 42 46 34;
+
+  --c-shadow: rgba(42, 46, 34, .08);
+  --c-shadow-lg: rgba(42, 46, 34, .12);
+
+  --app-bg: radial-gradient(1100px 640px at 50% -10%, rgba(61, 88, 38, .09), transparent 60%),
+            linear-gradient(180deg, #FBF9F4, #F7F4EE);
+  --glass: rgba(255, 255, 255, .72);
+  --glass-bar: rgba(255, 255, 255, .62);
+  --glass-solid: rgba(255, 255, 255, .96);
+
+  /* Reader-set text size. Multiplies the root font size, so every rem-based
+     size in the app scales together instead of one label growing alone. */
+  --fs: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --c-surface: 20 23 15;
+    --c-surface-raised: 29 33 23;
+    --c-surface-sunken: 16 19 9;
+
+    --c-ink: 236 239 228;
+    --c-ink-70: 168 172 156;
+    --c-ink-40: 134 139 125;
+
+    --c-line: rgba(236, 239, 228, .14);
+    --c-line-soft: rgba(236, 239, 228, .08);
+
+    --c-olive: 127 166 92;
+    --c-olive-light: 152 188 119;
+    --c-olive-dark: 92 122 63;
+
+    --c-gold: 224 185 78;
+    --c-gold-ink: 232 199 102;
+
+    --c-zone-in: 62 142 90;        --c-zone-in-ink: 111 201 143;
+    --c-zone-high: 201 138 30;     --c-zone-high-ink: 237 187 92;
+    --c-zone-vhigh: 180 71 47;     --c-zone-vhigh-ink: 238 136 113;
+    --c-zone-low: 58 110 134;      --c-zone-low-ink: 133 189 214;
+
+    --c-zone-vlow: 47 93 115;
+    --c-pattern-wide: 226 178 74;
+    --c-note: 224 185 78;
+
+    --c-zone-vlow: 47 93 115;
+  --c-pattern-wide: 226 178 74;
+  --c-note: 224 185 78;
+
+  --c-accent: 74 110 48;
+  --c-on-accent: 255 255 255;
+  --c-tooltip: 46 52 38;
+
+  --c-shadow: rgba(0, 0, 0, .40);
+    --c-shadow-lg: rgba(0, 0, 0, .55);
+
+    --app-bg: radial-gradient(1100px 640px at 50% -10%, rgba(127, 166, 92, .10), transparent 60%),
+              linear-gradient(180deg, #171B10, #14170F);
+    --glass: rgba(29, 33, 23, .72);
+    --glass-bar: rgba(29, 33, 23, .70);
+    --glass-solid: rgba(29, 33, 23, .97);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-surface: 20 23 15;
+  --c-surface-raised: 29 33 23;
+  --c-surface-sunken: 16 19 9;
+
+  --c-ink: 236 239 228;
+  --c-ink-70: 168 172 156;
+  --c-ink-40: 134 139 125;
+
+  --c-line: rgba(236, 239, 228, .14);
+  --c-line-soft: rgba(236, 239, 228, .08);
+
+  --c-olive: 127 166 92;
+  --c-olive-light: 152 188 119;
+  --c-olive-dark: 92 122 63;
+
+  --c-gold: 224 185 78;
+  --c-gold-ink: 232 199 102;
+
+  --c-zone-in: 62 142 90;        --c-zone-in-ink: 111 201 143;
+    --c-zone-high: 201 138 30;     --c-zone-high-ink: 237 187 92;
+    --c-zone-vhigh: 180 71 47;     --c-zone-vhigh-ink: 238 136 113;
+    --c-zone-low: 58 110 134;      --c-zone-low-ink: 133 189 214;
+
+  --c-shadow: rgba(0, 0, 0, .40);
+  --c-shadow-lg: rgba(0, 0, 0, .55);
+
+  --app-bg: radial-gradient(1100px 640px at 50% -10%, rgba(127, 166, 92, .10), transparent 60%),
+            linear-gradient(180deg, #171B10, #14170F);
+  --glass: rgba(29, 33, 23, .72);
+  --glass-bar: rgba(29, 33, 23, .70);
+  --glass-solid: rgba(29, 33, 23, .97);
+}
+
+
+/* ── The case's handout is always light ───────────────────────────────────
+   The A4 sheet is printed and exported to PNG for the case to carry to a
+   doctor, so it must not follow the coach's screen theme. Re-declaring the
+   palette on the sheet itself covers both paths at once: on-screen preview,
+   and the html2canvas capture that only ever sees on-screen styles. */
+.page-a4 {
+  color-scheme: light;
+  --c-surface: 255 255 255; --c-surface-raised: 255 255 255; --c-surface-sunken: 245 245 245;
+  --c-ink: 42 46 34; --c-ink-70: 104 105 95; --c-ink-40: 134 135 126;
+  --c-line: rgba(42,46,34,.12); --c-line-soft: rgba(42,46,34,.07);
+  --c-olive: 61 88 38; --c-olive-light: 92 122 63; --c-olive-dark: 46 68 32;
+  --c-gold: 201 157 47; --c-gold-ink: 135 105 32;
+  --c-zone-in: 62 142 90; --c-zone-in-ink: 54 124 79;
+  --c-zone-high: 201 138 30; --c-zone-high-ink: 148 101 22;
+  --c-zone-vhigh: 180 71 47; --c-zone-vhigh-ink: 180 71 47;
+  --c-zone-low: 58 110 134; --c-zone-low-ink: 58 110 134;
+  --c-zone-vlow: 47 93 115; --c-pattern-wide: 176 132 35; --c-note: 154 118 32;
+  --c-shadow: rgba(42,46,34,.08); --c-shadow-lg: rgba(42,46,34,.12);
+  background: #fff;
+  color: rgb(var(--c-ink));
+}
 
 html, body { margin: 0; padding: 0; }
+html { font-size: calc(100% * var(--fs)); }
 
 body {
-  background:
-    radial-gradient(1100px 640px at 50% -10%, rgba(61,88,38,.09), transparent 60%),
-    linear-gradient(180deg, #FBF9F4, #F7F4EE);
+  background: var(--app-bg);
+  background-attachment: fixed;
   min-height: 100dvh;
-  color: #2A2E22;
+  color: rgb(var(--c-ink));
   -webkit-font-smoothing: antialiased;
 }
 
@@ -20,18 +183,23 @@ body {
 body, p, li, td, th { line-height: 1.75; }
 h1, h2, h3, h4 { line-height: 1.4; }
 
+/* Latin does not need Thai's headroom, and at 1.75 an English paragraph reads
+   airy to the point of drifting. */
+html[lang='en'] body, html[lang='en'] p, html[lang='en'] li,
+html[lang='en'] td, html[lang='en'] th { line-height: 1.65; }
+
 /* Any digit that changes when the range changes must not shift the layout. */
 .num { font-variant-numeric: tabular-nums; }
 
 /* Glass on the shell only — never under a number. */
-.glass { background: rgba(255,255,255,.72); backdrop-filter: blur(10px) saturate(140%); border: 1px solid rgba(42,46,34,.07); }
-.glass-bar { background: rgba(255,255,255,.62); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(42,46,34,.07); }
+.glass { background: var(--glass); backdrop-filter: blur(10px) saturate(140%); border: 1px solid var(--c-line-soft); }
+.glass-bar { background: var(--glass-bar); backdrop-filter: blur(18px); border-bottom: 1px solid var(--c-line-soft); }
 @supports not (backdrop-filter: blur(1px)) {
-  .glass, .glass-bar { background: rgba(255,255,255,.96); }
+  .glass, .glass-bar { background: var(--glass-solid); }
 }
 
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid rgba(61,88,38,.45);
+  outline: 3px solid rgb(var(--c-olive) / .55);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -40,7 +208,24 @@ h1, h2, h3, h4 { line-height: 1.4; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* The handout goes to a printer and to whoever the case shows it to, so it is
+   always the light palette on white regardless of the screen theme. */
 @media print {
+  :root, :root[data-theme='dark'] {
+    color-scheme: light;
+    --c-surface: 255 255 255; --c-surface-raised: 255 255 255; --c-surface-sunken: 245 245 245;
+    --c-ink: 42 46 34; --c-ink-70: 104 105 95; --c-ink-40: 134 135 126;
+    --c-line: rgba(42,46,34,.12); --c-line-soft: rgba(42,46,34,.07);
+    --c-olive: 61 88 38; --c-olive-light: 92 122 63; --c-olive-dark: 46 68 32;
+    --c-gold: 201 157 47; --c-gold-ink: 135 105 32;
+    --c-zone-in: 62 142 90; --c-zone-in-ink: 54 124 79;
+    --c-zone-high: 201 138 30; --c-zone-high-ink: 148 101 22;
+    --c-zone-vhigh: 180 71 47; --c-zone-vhigh-ink: 180 71 47;
+    --c-zone-low: 58 110 134; --c-zone-low-ink: 58 110 134;
+    --c-zone-vlow: 47 93 115; --c-pattern-wide: 176 132 35; --c-note: 154 118 32;
+    --c-accent: 61 88 38; --c-on-accent: 255 255 255; --c-tooltip: 42 46 34;
+    --fs: 1;
+  }
   body { background: #fff; }
   .no-print { display: none !important; }
   .page-a4 { width: 210mm; min-height: 297mm; box-shadow: none !important; margin: 0 !important; }

@@ -57,13 +57,13 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
         }}
         className={`glass rounded-lg p-6 text-center shadow-md transition sm:p-9 ${dragging ? 'ring-2 ring-olive' : ''}`}
       >
-        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-olive/10 text-olive">
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-accent/10 text-olive">
           <IconUpload className="h-6 w-6" />
         </div>
         <button
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="w-full rounded-sm bg-olive px-5 py-3.5 font-head text-[1rem] font-medium text-white shadow-sm transition hover:bg-olive-dark disabled:opacity-50 sm:w-auto"
+          className="w-full rounded-sm bg-accent px-5 py-3.5 font-head text-[1rem] font-medium text-accent-ink shadow-sm transition hover:bg-accent-dark disabled:opacity-50 sm:w-auto"
         >
           {busy ? 'กำลังอ่านไฟล์…' : 'เลือกไฟล์จากเครื่อง'}
         </button>
@@ -91,7 +91,7 @@ export default function Uploader({ onResult }: { onResult: (r: AnalysisResult) =
         </p>
       )}
 
-      <div className="mt-7 rounded-md border border-line bg-white/50 p-4 text-[0.85rem] leading-relaxed text-ink-70">
+      <div className="mt-7 rounded-md border border-line bg-surface-raised/50 p-4 text-[0.85rem] leading-relaxed text-ink-70">
         <p className="font-medium text-ink">ไฟล์ไปไหน</p>
         <p className="mt-1.5">
           ไฟล์ถูกอ่านในเซิร์ฟเวอร์แล้วส่งผลกลับมาทันที ไม่มีการเก็บไฟล์หรือข้อมูลน้ำตาลไว้ในระบบ

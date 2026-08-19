@@ -85,14 +85,14 @@ export default function AgpChart({
             stroke={g === 70 || g === 180 ? 'rgba(42,46,34,.26)' : 'rgba(42,46,34,.12)'}
             strokeWidth={g === 70 || g === 180 ? 1.1 : 0.8}
             strokeDasharray={g === 140 ? '4 4' : undefined} />
-          <text x={PAD.left - 7} y={y(g) + 3.5} textAnchor="end" fontSize={narrow ? 10 : 10.5} fill="#68695F" className="num">{g}</text>
+          <text x={PAD.left - 7} y={y(g) + 3.5} textAnchor="end" fontSize={narrow ? 10 : 10.5} fill="rgb(var(--c-ink-70))" className="num">{g}</text>
         </g>
       ))}
 
       {(narrow ? [0, 360, 720, 1080, 1440] : [0, 180, 360, 540, 720, 900, 1080, 1260, 1440]).map((min) => (
         <g key={min}>
           <line x1={x(min)} x2={x(min)} y1={PAD.top} y2={PAD.top + plotH} stroke="rgba(42,46,34,.07)" strokeWidth="0.8" />
-          <text x={x(min)} y={H - 7} textAnchor="middle" fontSize={narrow ? 10 : 10.5} fill="#68695F" className="num">
+          <text x={x(min)} y={H - 7} textAnchor="middle" fontSize={narrow ? 10 : 10.5} fill="rgb(var(--c-ink-70))" className="num">
             {String(Math.floor(min / 60) % 24).padStart(2, '0')}
           </text>
         </g>
@@ -100,7 +100,7 @@ export default function AgpChart({
 
       <path d={area('p5', 'p95')} fill="rgba(46,68,32,.13)" />
       <path d={area('p25', 'p75')} fill="rgba(46,68,32,.26)" />
-      <path d={median} fill="none" stroke="#2E4420" strokeWidth="2.2" strokeLinecap="round" />
+      <path d={median} fill="none" stroke="rgb(var(--c-olive-dark))" strokeWidth="2.2" strokeLinecap="round" />
 
       {lowConf.map((b) => (
         <rect key={b.minute} x={x(b.minute) - 2} y={PAD.top} width={4} height={plotH} fill="rgba(247,244,238,.55)" />
@@ -110,7 +110,7 @@ export default function AgpChart({
       {notes.map((n) => {
         const cx = x(n.minute);
         const cy = y(n.atValue);
-        const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : '#9A7620';
+        const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : 'rgb(var(--c-note))';
         const isOpen = open === n.minute;
         return (
           <g key={n.minute}
@@ -138,11 +138,11 @@ export default function AgpChart({
       const n = notes.find((z) => z.minute === open);
       if (!n) return null;
       const leftPct = (x(n.minute) / W) * 100;
-      const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : '#9A7620';
+      const tone = n.pattern ? PATTERN_STYLE[n.pattern].ink : 'rgb(var(--c-note))';
       return (
         <div
           role="status"
-          className="pointer-events-none absolute z-20 w-[min(19rem,78vw)] rounded-md border border-line bg-white/97 px-3 py-2.5 shadow-lg"
+          className="pointer-events-none absolute z-20 w-[min(19rem,78vw)] rounded-md border border-line bg-surface-raised/97 px-3 py-2.5 shadow-lg"
           style={{
             left: `clamp(0.5rem, ${leftPct}% - 9.5rem, calc(100% - min(19rem,78vw) - 0.5rem))`,
             top: `${((y(n.atValue) + 14) / H) * 100}%`,

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Kanit, Sarabun } from 'next/font/google';
+import { PrefsProvider } from '@/components/PrefsProvider';
+import { BOOT_SCRIPT } from '@/lib/prefs';
 import './globals.css';
 
 // Self-hosted by next/font at build time — no request to Google at runtime, so
@@ -32,8 +34,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" className={`${kanit.variable} ${sarabun.variable}`}>
-      <body className="font-body text-ink">{children}</body>
+    // suppressHydrationWarning: the boot script below rewrites data-theme, lang
+    // and --fs before React hydrates, so the markup React compares against is
+    // meant to differ from what the server sent.
+    <html lang="th" suppressHydrationWarning className={`${kanit.variable} ${sarabun.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
+      </head>
+      <body className="font-body text-ink">
+        <PrefsProvider>{children}</PrefsProvider>
+      </body>
     </html>
   );
 }
