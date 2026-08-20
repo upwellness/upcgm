@@ -66,6 +66,8 @@ export interface DataQuality {
 export interface RangeBucket {
   key: string;
   labelTh: string;
+  /** Consensus name for the band — TIR, TBR L1, TAR L2 … (see lib/bands.ts). */
+  abbr: string;
   pct: number;
   minutesPerDay: number;
 }

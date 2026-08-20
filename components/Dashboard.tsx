@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { aiEnabled, loadAiConfig, type AiConfig, EMPTY as EMPTY_AI } from '@/lib/ai-config';
 import { mealResponse, readingsFromWire } from '@/lib/meal-response';
 import { loadMarkers, saveMarkers } from '@/lib/markers-store';
-import { fmtDateTime, fmtThaiDate, fromLocalInputValue, toLocalInputValue } from '@/lib/time';
+import { fmtDateTime, fmtDate, fromLocalInputValue, toLocalInputValue } from '@/lib/time';
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import AgpChart, { type AgpNoteView } from './AgpChart';
 import ExportDialog from './ExportDialog';
@@ -156,7 +156,7 @@ export default function Dashboard() {
           <p className="truncate text-[0.8rem] text-ink-40 sm:text-[0.83rem]">
             {result.sourceName} · <span className="num">{result.quality.rowsUsed.toLocaleString(locale === 'en' ? 'en-US' : 'th-TH')} {t('ค่า', 'readings')}</span>
             {' · '}
-            <span className="num">{fmtThaiDate(result.metrics.firstT)} – {fmtThaiDate(result.metrics.lastT, { year: true })}</span>
+            <span className="num">{fmtDate(result.metrics.firstT, locale)} – {fmtDate(result.metrics.lastT, locale, { year: true })}</span>
           </p>
         </div>
         <PrefsMenu />

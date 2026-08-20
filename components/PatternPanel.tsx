@@ -1,7 +1,7 @@
 'use client';
 
-import { PATTERN_STYLE, type PatternKey } from '@/lib/bands';
-import { useT } from './PrefsProvider';
+import { PATTERN_STYLE, label, type PatternKey } from '@/lib/bands';
+import { usePrefs, useT } from './PrefsProvider';
 import { IconInfo } from './Icons';
 
 /** Mirror of PatternSnapshot in server/cgm/patterns.ts — the wire shape only. */
@@ -29,13 +29,14 @@ export function PatternGlyph({ k, className = 'h-5 w-[60px]' }: { k: PatternKey;
 }
 
 export function PatternChip({ k, size = 'md' }: { k: PatternKey; size?: 'sm' | 'md' }) {
+  const { prefs: { locale } } = usePrefs();
   const s = PATTERN_STYLE[k];
   const pad = size === 'sm' ? 'px-2 py-0.5 text-[0.72rem]' : 'px-2.5 py-1 text-[0.8rem]';
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${pad}`}
       style={{ background: s.chip, color: s.ink }}>
       <PatternGlyph k={k} className={size === 'sm' ? 'h-3.5 w-[34px]' : 'h-4 w-[42px]'} />
-      {s.labelTh}
+      {label(s, locale)}
     </span>
   );
 }
@@ -44,6 +45,7 @@ const ORDER: PatternKey[] = ['crash', 'stuck', 'spike', 'wide', 'flat'];
 
 export default function PatternPanel({ snap }: { snap: PatternSnapshotView }) {
   const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const total = ORDER.reduce((s, k) => s + (snap.counts[k] ?? 0), 0);
 
   return (
@@ -87,7 +89,7 @@ export default function PatternPanel({ snap }: { snap: PatternSnapshotView }) {
                 <li key={k} className="flex items-center gap-3">
                   <span className="w-[74px] shrink-0"><PatternGlyph k={k} className="h-6 w-[64px]" /></span>
                   <span className="w-[46px] shrink-0 font-head text-[0.92rem] font-semibold"
-                    style={{ color: s.ink }}>{s.labelTh}</span>
+                    style={{ color: s.ink }}>{label(s, locale)}</span>
                   <span className="h-[22px] min-w-0 flex-1 overflow-hidden rounded-sm bg-surface-sunken">
                     <span className="block h-full rounded-sm"
                       style={{ width: `${Math.max(6, (n / total) * 100)}%`, background: s.ink, opacity: isDom ? 1 : 0.45 }} />

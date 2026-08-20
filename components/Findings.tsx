@@ -1,7 +1,7 @@
 'use client';
 
-import { SEVERITY_STYLE } from '@/lib/bands';
-import { useT } from './PrefsProvider';
+import { SEVERITY_STYLE, label } from '@/lib/bands';
+import { usePrefs, useT } from './PrefsProvider';
 import { IconAlert, IconCheck, IconEye, IconInfo } from './Icons';
 
 export interface FindingView {
@@ -22,6 +22,7 @@ const GLYPH: Record<FindingView['severity'], React.ReactNode> = {
 
 export default function Findings({ findings }: { findings: FindingView[] }) {
   const t = useT();
+  const { prefs: { locale } } = usePrefs();
   if (findings.length === 0) return null;
   return (
     <ol className="space-y-3">
@@ -36,7 +37,7 @@ export default function Findings({ findings }: { findings: FindingView[] }) {
                   <h3 className="font-head text-[1rem] font-medium leading-snug">{f.titleTh}</h3>
                   <span className="rounded-full px-2 py-0.5 text-[0.7rem] font-medium"
                     style={{ background: s.chip, color: s.ink }}>
-                    {s.labelTh}
+                    {label(s, locale)}
                   </span>
                   {f.basis === 'house' && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-surface-sunken px-2 py-0.5 text-[0.7rem] text-ink-40"

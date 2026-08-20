@@ -2,8 +2,8 @@
 
 import { forwardRef } from 'react';
 import { usePrefs, useT } from './PrefsProvider';
-import { BANDS, PATTERN_STYLE, fmtPct, type PatternKey } from '@/lib/bands';
-import { fmtDuration, fmtThaiDate, pctToMinutesPerDay } from '@/lib/time';
+import { BANDS, PATTERN_STYLE, fmtPct, bandLabel, label, type PatternKey } from '@/lib/bands';
+import { fmtDuration, fmtDate, pctToMinutesPerDay } from '@/lib/time';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import GlucoseChart from './GlucoseChart';
 import AgpChart from './AgpChart';
@@ -78,7 +78,7 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
           </div>
           <div className="mt-0.5 text-[0.82rem] text-ink-70">
             {clientName ? t(`คุณ${clientName} · `, `${clientName} · `) : ''}
-            {fmtThaiDate(w.from, { year: true })} – {fmtThaiDate(w.to, { year: true })}
+            {fmtDate(w.from, locale, { year: true })} – {fmtDate(w.to, locale, { year: true })}
             {' · '}
             <span className="num">{w.days < 1 ? fmtDuration(Math.round(w.days * 1440), locale) : t(`${w.days.toFixed(1)} วัน`, `${w.days.toFixed(1)} days`)}</span>
           </div>
@@ -95,13 +95,14 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
       {m && (
         <>
           <div className="mt-4 grid grid-cols-4 gap-2.5">
-            <Big label={t('อยู่ในช่วงเป้าหมาย', 'In target')} value={w.gate.showRangePercents ? pc(m.tir70_180) : '—'} hint="70–180" tone="#367C4F" />
+            <Big label={t('อยู่ในช่วงเป้าหมาย', 'In target')} abbr="TIR" value={w.gate.showRangePercents ? pc(m.tir70_180) : '—'} hint="70–180" tone="#367C4F" />
             <Big label={t('ค่าเฉลี่ย', 'Average')} value={String(Math.round(m.mean))} hint={t('มก./ดล.', 'mg/dL')} tone="#2A2E22" />
-            <Big label={t('ความแกว่ง', 'Variability')} value={w.gate.showCv ? pc(m.cv) : '—'} hint={t('CV · เกณฑ์ ≤ 36%', 'CV · goal 36% or less')} tone={m.cv <= 36 ? '#367C4F' : '#946516'} />
+            <Big label={t('ความแกว่ง', 'Variability')} abbr="CV" value={w.gate.showCv ? pc(m.cv) : '—'} hint={t('เกณฑ์ ≤ 36%', 'goal 36% or less')} tone={m.cv <= 36 ? '#367C4F' : '#946516'} />
             <Big
               label={t('ประมาณ HbA1c', 'Estimated HbA1c')}
+              abbr="GMI"
               value={w.gate.showGmi && m.gmi != null ? `${m.gmi.toFixed(1)}%` : '—'}
-              hint={t('GMI · ไม่ใช่ผลเลือด', 'GMI · not a blood test')}
+              hint={t('ไม่ใช่ผลเลือด', 'not a blood test')}
               tone="#2A2E22"
             />
           </div>
@@ -126,7 +127,8 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
               {BANDS.map((b) => (
                 <span key={b.key} className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ background: b.fill }} />
-                  {b.labelTh}
+                  {bandLabel(b.key, b.labelTh, locale)}
+                  <span className="text-ink-40">{b.abbr}</span>
                 </span>
               ))}
             </div>
@@ -191,7 +193,7 @@ const A4Sheet = forwardRef<HTMLDivElement, A4Props>(function A4Sheet(
                       strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <span className="text-[0.78rem] font-medium" style={{ color: PATTERN_STYLE[k].ink }}>
-                    {PATTERN_STYLE[k].labelTh}
+                    {label(PATTERN_STYLE[k], locale)}
                   </span>
                   <span className="num text-[0.76rem] text-ink-70">{t(`${patterns.counts[k]} มื้อ`, `${patterns.counts[k]} ${patterns.counts[k] === 1 ? 'meal' : 'meals'}`)}</span>
                 </span>
@@ -270,10 +272,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Big({ label, value, hint, tone }: { label: string; value: string; hint: string; tone: string }) {
+/**
+ * `abbr` is the consensus name (TIR, CV, GMI). Printed as plain text rather than
+ * the screen's hover tag, because paper has no tooltip — and this page is the
+ * one that gets carried into a doctor's room, where the standard name is the
+ * word that travels.
+ */
+function Big({ label, value, hint, tone, abbr }:
+  { label: string; value: string; hint: string; tone: string; abbr?: string }) {
   return (
     <div className="rounded px-2.5 py-2" style={{ background: '#F7F4EE' }}>
-      <div className="text-[0.68rem] leading-tight text-ink-70">{label}</div>
+      <div className="flex items-baseline gap-1 text-[0.68rem] leading-tight text-ink-70">
+        <span>{label}</span>
+        {abbr && (
+          <span className="shrink-0 rounded-[3px] px-1 text-[0.58rem] font-semibold tracking-[0.02em] text-ink-40"
+            style={{ border: '1px solid rgba(42,46,34,.18)' }}>{abbr}</span>
+        )}
+      </div>
       <div className="num font-head text-[1.3rem] font-semibold leading-none" style={{ color: tone, marginTop: 3 }}>{value}</div>
       <div className="text-[0.63rem] text-ink-40" style={{ marginTop: 2 }}>{hint}</div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { usePrefs, useT } from './PrefsProvider';
-import { PATTERN_STYLE, type PatternKey } from '@/lib/bands';
+import { PATTERN_STYLE, label, type PatternKey } from '@/lib/bands';
 import { fmtDuration } from '@/lib/time';
 import type { Reading } from '@/lib/types';
 import GlucoseChart from './GlucoseChart';
@@ -129,7 +129,7 @@ export default function EventExplorer({
                     ? { background: s.ink, color: '#fff' }
                     : { background: s.chip, color: s.ink }}>
                   <PatternGlyph k={k} className="h-3.5 w-[34px]" />
-                  {s.labelTh} {snap.counts[k]}
+                  {label(s, locale)} {snap.counts[k]}
                   {snap.dominant === k && <span className="text-[0.68rem] opacity-80">{t('· บ่อยสุด', '· most common')}</span>}
                 </button>
               );

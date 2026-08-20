@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useT } from './PrefsProvider';
+import { usePrefs, useT } from './PrefsProvider';
 import type { MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
 import A4Sheet from './A4Sheet';
 import type { PatternSnapshotView } from './PatternPanel';
@@ -27,6 +27,7 @@ interface Props {
 
 export default function ExportDialog(props: Props) {
   const t = useT();
+  const { prefs: { locale } } = usePrefs();
   const { open, onClose } = props;
   const sheetRef = useRef<HTMLDivElement>(null);
   const [clientName, setClientName] = useState('');
@@ -156,7 +157,9 @@ export default function ExportDialog(props: Props) {
                   limitationsTh={props.limitationsTh}
                   narrative={props.narrative}
                   patterns={props.patterns}
-                  generatedAtLabel={new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  // The date the handout was printed. Thai keeps the Buddhist
+                  // year the rest of the Thai page uses; English must not carry it.
+                  generatedAtLabel={new Date().toLocaleDateString(locale === 'en' ? 'en-GB' : 'th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
                 />
               </div>
             </div>

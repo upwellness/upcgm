@@ -1,6 +1,6 @@
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, MealResponse } from '@/lib/types';
 import { tx, type Locale } from './i18n';
-import { fmtDate, fmtDuration, fmtThaiDate, fmtTime, pctToMinutesPerDay } from '@/lib/time';
+import { fmtDate, fmtDuration, fmtTime, pctToMinutesPerDay } from '@/lib/time';
 import { readingsFromWire } from '@/lib/meal-response';
 import { DEVICE_FLOOR, TARGETS_ADULT_DIABETES, gateForWindow } from './thresholds';
 import { patternDefs, analysePatterns, type MealPattern, type PatternSnapshot } from './patterns';

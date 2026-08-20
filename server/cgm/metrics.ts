@@ -1,5 +1,6 @@
 import { minuteOfDay, pctToMinutesPerDay, startOfDay } from '@/lib/time';
 import { tx, type Locale } from './i18n';
+import { BAND_BY_KEY } from '@/lib/bands';
 import { mealResponse } from '@/lib/meal-response';
 import type { AgpBin, DailyProfile, LowEvent, Metrics, RangeBucket, Reading } from '@/lib/types';
 import { isMetricGrade } from './qc';
@@ -82,12 +83,16 @@ export function computeMetrics(all: Reading[], locale: Locale = 'th'): Metrics |
   });
   const nightValues = night.map((r) => r.v);
 
+  // Each bucket carries the consensus name (TBR L2 … TAR L2) alongside the
+  // friendly one, so anything downstream of this wire — a screen, an export, a
+  // doctor's copy — is talking about the same figure by the name the literature
+  // uses. The tags live in lib/bands.ts; this file must not spell its own.
   const buckets: RangeBucket[] = [
-    { key: 'tbr54', labelTh: t('ต่ำมาก (ต่ำกว่า 54)', 'Very low (below 54)'), pct: tbrUnder54, minutesPerDay: pctToMinutesPerDay(tbrUnder54) },
-    { key: 'tbr70', labelTh: t('ต่ำ (54–69)', 'Low (54–69)'), pct: pct(counts.tbr70, n), minutesPerDay: pctToMinutesPerDay(pct(counts.tbr70, n)) },
-    { key: 'tir', labelTh: t('อยู่ในเป้าหมาย (70–180)', 'In target (70–180)'), pct: tir, minutesPerDay: pctToMinutesPerDay(tir) },
-    { key: 'tar180', labelTh: t('สูง (181–250)', 'High (181–250)'), pct: tar180to250, minutesPerDay: pctToMinutesPerDay(tar180to250) },
-    { key: 'tar250', labelTh: t('สูงมาก (มากกว่า 250)', 'Very high (above 250)'), pct: tarOver250, minutesPerDay: pctToMinutesPerDay(tarOver250) },
+    { key: 'tbr54', labelTh: t('ต่ำมาก (ต่ำกว่า 54)', 'Very low (below 54)'), abbr: BAND_BY_KEY.tbr54.abbr, pct: tbrUnder54, minutesPerDay: pctToMinutesPerDay(tbrUnder54) },
+    { key: 'tbr70', labelTh: t('ต่ำ (54–69)', 'Low (54–69)'), abbr: BAND_BY_KEY.tbr70.abbr, pct: pct(counts.tbr70, n), minutesPerDay: pctToMinutesPerDay(pct(counts.tbr70, n)) },
+    { key: 'tir', labelTh: t('อยู่ในเป้าหมาย (70–180)', 'In target (70–180)'), abbr: BAND_BY_KEY.tir.abbr, pct: tir, minutesPerDay: pctToMinutesPerDay(tir) },
+    { key: 'tar180', labelTh: t('สูง (181–250)', 'High (181–250)'), abbr: BAND_BY_KEY.tar180.abbr, pct: tar180to250, minutesPerDay: pctToMinutesPerDay(tar180to250) },
+    { key: 'tar250', labelTh: t('สูงมาก (มากกว่า 250)', 'Very high (above 250)'), abbr: BAND_BY_KEY.tar250.abbr, pct: tarOver250, minutesPerDay: pctToMinutesPerDay(tarOver250) },
   ];
 
   return {

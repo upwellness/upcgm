@@ -1,7 +1,7 @@
 import type { MealMarker, Reading } from '@/lib/types';
 import { tx, type Locale } from './i18n';
 import type { Minutes } from '@/lib/time';
-import { fmtThaiDate, fmtTime, minuteOfDay } from '@/lib/time';
+import { fmtDate, fmtTime, minuteOfDay } from '@/lib/time';
 import { mealResponse, POST_MEAL_MINUTES } from '@/lib/meal-response';
 import { NIGHT_END_MIN, NIGHT_START_MIN } from './thresholds';
 import { patternDefs, classifyMeal, type MealPattern, type PatternKey } from './patterns';
@@ -154,7 +154,7 @@ export function buildEvents(
       markerId: marker?.id ?? null,
       labelTh: marker?.label ?? null,
       overnight: mod >= NIGHT_START_MIN && mod < NIGHT_END_MIN,
-      whenTh: `${fmtThaiDate(t)} ${fmtTime(t)}`,
+      whenTh: `${fmtDate(t, locale)} ${fmtTime(t)}`,
       // 30 minutes of lead-in so the flat line before the rise is visible —
       // without it a coach cannot see what "back to where it started" means.
       fromT: t - 30,

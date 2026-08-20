@@ -1,6 +1,6 @@
 import type { MealMarker, MealResponse, Reading } from '@/lib/types';
 import { tx, type Locale } from './i18n';
-import { fmtDate, fmtThaiDate, fmtTime, fmtDuration } from '@/lib/time';
+import { fmtDate, fmtTime, fmtDuration } from '@/lib/time';
 import { POST_MEAL_MINUTES, PRE_MEAL_MINUTES } from '@/lib/meal-response';
 import { SOURCE_HOUSE } from './thresholds';
 

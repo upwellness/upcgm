@@ -4,6 +4,8 @@ import { analyse } from '@/server/cgm/analyse';
 import { interpret } from '@/server/cgm/interpret';
 import { gateForWindow } from '@/server/cgm/thresholds';
 import { patternDefs, patternRuleNote } from '@/server/cgm/patterns';
+import { buildEvents } from '@/server/cgm/excursions';
+import { BANDS, MEAL_KINDS, PATTERN_STYLE, SEVERITY_STYLE, label } from '@/lib/bands';
 import { makeWorkbook, series, flat } from './helpers';
 
 /**
@@ -35,6 +37,51 @@ describe('English really is English', () => {
     expect(strings.length).toBeGreaterThan(10);
     const leaked = strings.filter((s) => thai.test(s));
     expect(leaked, `Thai leaked into the English build:\n${leaked.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * The sweep above only reaches strings the *server* composes. Half the words
+   * on screen come from lookup tables in lib/bands.ts that components read
+   * directly — and for one release every one of them printed Thai in an English
+   * session, because nothing here looked at them.
+   */
+  it('leaves no Thai in the lookup tables the components read directly', () => {
+    const tables: [string, { labelTh: string; labelEn: string }[]][] = [
+      ['BANDS', BANDS],
+      ['SEVERITY_STYLE', Object.values(SEVERITY_STYLE)],
+      ['PATTERN_STYLE', Object.values(PATTERN_STYLE)],
+      ['MEAL_KINDS', [...MEAL_KINDS]],
+    ];
+    for (const [name, rows] of tables) {
+      expect(rows.length, name).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row.labelEn, `${name}: "${row.labelTh}" has no English half`).toBeTruthy();
+        expect(thai.test(label(row, 'en')), `${name}: "${row.labelEn}" is not English`).toBe(false);
+        expect(thai.test(label(row, 'th')), `${name}: "${row.labelTh}" is not Thai`).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * Dates were the last Thai left on an English screen: every event timestamp
+   * went through fmtThaiDate regardless of who was reading, and the finding
+   * that names the strongest rise carries one inside an English sentence.
+   * The Buddhist year is the tell — 2569 sitting next to English prose.
+   */
+  it('dates an event in the reader\u2019s calendar, not always the Thai one', () => {
+    // a flat line with one meal-sized rise, so there is an event to date at all
+    const values = [
+      ...Array.from({ length: 72 }, () => 100),
+      ...[110, 140, 175, 190, 185, 165, 140, 120, 108],
+      ...Array.from({ length: 72 }, () => 100),
+    ];
+    const readings = values.map((v, i) => ({ t: Date.UTC(2026, 6, 12, 6, 0) / 60000 + i * 5, v, flag: 'ok' as const }));
+
+    const en = buildEvents(readings, [], undefined, 'en');
+    const th = buildEvents(readings, [], undefined, 'th');
+    expect(en.length, 'no event was detected, so nothing was dated').toBeGreaterThan(0);
+    for (const e of en) expect(thai.test(e.whenTh), `English build dated an event "${e.whenTh}"`).toBe(false);
+    for (const e of th) expect(thai.test(e.whenTh), `Thai build dated an event "${e.whenTh}"`).toBe(true);
   });
 
   it('still speaks Thai when Thai is asked for', () => {

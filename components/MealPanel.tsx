@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { usePrefs, useT } from './PrefsProvider';
-import { MEAL_KINDS, type PatternKey } from '@/lib/bands';
+import { MEAL_KINDS, label, type PatternKey } from '@/lib/bands';
 import { mealResponse } from '@/lib/meal-response';
 import { fmtDateTime, fmtDuration, toLocalInputValue, fromLocalInputValue } from '@/lib/time';
 import { fromFile, newId, toFile } from '@/lib/markers-store';
@@ -184,7 +184,7 @@ export default function MealPanel({ datasetId, sourceName, readings, markers, on
               <span className="text-[0.83rem] font-medium">{t('ประเภท', 'Type')}</span>
               <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as MealMarker['kind'] })}
                 className="mt-1 w-full rounded-sm border border-line bg-surface-raised px-3 py-2 text-[0.92rem] outline-none focus:border-olive">
-                {MEAL_KINDS.map((k) => <option key={k.key} value={k.key}>{k.glyph} {k.labelTh}</option>)}
+                {MEAL_KINDS.map((k) => <option key={k.key} value={k.key}>{k.glyph} {label(k, locale)}</option>)}
               </select>
             </label>
             <label className="block">
