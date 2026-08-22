@@ -6,7 +6,7 @@ import { aiEnabled, loadAiConfig, type AiConfig, EMPTY as EMPTY_AI } from '@/lib
 import { mealResponse, readingsFromWire } from '@/lib/meal-response';
 import { loadMarkers, saveMarkers } from '@/lib/markers-store';
 import { fmtDateTime, fmtDate, fromLocalInputValue, toLocalInputValue } from '@/lib/time';
-import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, Reading, WindowSummaryWire } from '@/lib/types';
+import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, Metrics, Reading, WindowSummaryWire } from '@/lib/types';
 import AgpChart, { type AgpNoteView } from './AgpChart';
 import ExportDialog from './ExportDialog';
 import Findings, { type FindingView } from './Findings';
@@ -33,6 +33,13 @@ interface AiResponse {
     eventSnapshot: EventSnapshotView;
     agpNotes: AgpNoteView[];
   };
+  /**
+   * Figures for a hand-picked or zoomed range, worked out by the server because
+   * the maths does not live in the browser. Absent for a preset window, which
+   * already arrived with its own.
+   */
+  windowMetrics?: Metrics | null;
+  windowGate?: WindowSummaryWire['gate'] | null;
   narrative?: string | null;
   reasonTh?: string | null;
 }
@@ -67,9 +74,9 @@ export default function Dashboard() {
 
   const activeWindow: WindowSummaryWire | null = useMemo(() => {
     if (!result) return null;
-    if (custom) return buildCustomWindow(result, custom.from, custom.to);
+    if (custom) return buildCustomWindow(result, custom.from, custom.to, locale);
     return result.windows.find((w) => w.key === windowKey) ?? result.windows[0] ?? null;
-  }, [result, windowKey, custom]);
+  }, [result, windowKey, custom, locale]);
 
   const responses = useMemo(
     () => markers.map((m) => mealResponse(m.id, m.t, readings)),
@@ -110,7 +117,13 @@ export default function Dashboard() {
     setAiBusy(true);
     const slice = readings.filter((r) => r.t >= activeWindow.from && r.t <= activeWindow.to);
     const payload = { locale,
-      result: { ...result, metrics: activeWindow.metrics ?? result.metrics, quality: { ...result.quality, spanDays: activeWindow.days, capturePct: activeWindow.capturePct }, lowEvents: activeWindow.lowEvents },
+      // `metrics` stays null for a hand-picked range. Substituting the file's
+      // own here is what made the findings describe the whole wear under a
+      // heading that named one evening — the window bounds below let the server
+      // compute the right ones instead.
+      result: { ...result, metrics: activeWindow.metrics, quality: { ...result.quality, spanDays: activeWindow.days, capturePct: activeWindow.capturePct }, lowEvents: activeWindow.lowEvents },
+      windowFrom: activeWindow.from,
+      windowTo: activeWindow.to,
       meds,
       markers: markers.filter((m) => m.t >= activeWindow.from && m.t <= activeWindow.to),
       responses: responses.filter((r) => markers.find((m) => m.id === r.markerId && m.t >= activeWindow.from && m.t <= activeWindow.to)),
@@ -145,7 +158,16 @@ export default function Dashboard() {
     );
   }
 
-  const w = activeWindow;
+  // A hand-picked range has no figures until the server sends them back, and
+  // AGP stays off for it: the bins are only built for the preset windows, so a
+  // gate that switched it on would open an empty panel.
+  const w = activeWindow && !activeWindow.metrics && ai?.windowMetrics
+    ? {
+        ...activeWindow,
+        metrics: ai.windowMetrics,
+        gate: ai.windowGate ? { ...ai.windowGate, showAgp: false } : activeWindow.gate,
+      }
+    : activeWindow;
   const interp = ai?.interpretation;
 
   return (
@@ -232,6 +254,7 @@ export default function Dashboard() {
                   to={w.to}
                   markers={markers}
                   height={320}
+                  onFocusRange={(f, t2) => setCustom({ from: f, to: t2 })}
                 />
               </section>
 
@@ -533,27 +556,37 @@ function RangePicker({
  * sent, except for the metrics — those come from the server's own slice via the
  * findings call, so a hand-picked window never gets a second maths implementation.
  */
-function buildCustomWindow(result: AnalysisResult, from: number, to: number): WindowSummaryWire {
+function buildCustomWindow(result: AnalysisResult, from: number, to: number, locale: 'th' | 'en'): WindowSummaryWire {
   const idx: number[] = [];
   for (let i = 0; i < result.series.t.length; i++) {
     const t = result.series.t[i];
     if (t >= from && t <= to) idx.push(i);
   }
   const days = (to - from) / 1440;
-  const base = result.windows.find((w) => Math.abs(w.days - days) < 0.01);
+  // Zooming the chart and pressing "recompute" lands here with any span at all,
+  // so capture is worked out from the range itself. Reading it off a preset
+  // window of the same length only ever matched when the reader used a preset,
+  // and reported a confident 0% the rest of the time.
+  const expected = Math.max(1, (to - from) / Math.max(1, result.quality.intervalMinutes));
+  const capturePct = Math.min(100, (idx.length / expected) * 100);
   return {
     key: '__custom',
-    labelTh: `ช่วงที่เลือก · ${fmtDateTime(from)} – ${fmtDateTime(to)}`,  // wraps on narrow screens by design
+    labelTh: locale === 'en'
+      ? `Selected · ${fmtDateTime(from)} – ${fmtDateTime(to)}`
+      : `ช่วงที่เลือก · ${fmtDateTime(from)} – ${fmtDateTime(to)}`,  // wraps on narrow screens by design
     from,
     to,
     days,
     n: idx.length,
-    capturePct: base?.capturePct ?? 0,
+    capturePct,
     metrics: null,
     agp: [],
     daily: [],
     lowEvents: result.lowEvents.filter((e) => e.from >= from && e.to <= to),
-    gate: { showRangePercents: days >= 0.5, showCv: days >= 3, showGmi: false, showAgp: false, noteTh: null },
+    // Nothing is shown until the server has judged the range: deciding here
+    // what is safe to display would be a second copy of gateForWindow, living
+    // on the client, free to drift from the one that matters.
+    gate: { showRangePercents: false, showCv: false, showGmi: false, showAgp: false, noteTh: null },
     truncated: false,
   };
 }

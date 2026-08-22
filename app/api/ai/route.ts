@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { asLocale, tx } from '@/server/cgm/i18n';
 import type { AnalysisResult, GlucoseLoweringMeds, MealMarker, MealResponse } from '@/lib/types';
 import { interpret } from '@/server/cgm/interpret';
+import { computeMetrics } from '@/server/cgm/metrics';
+import { gateForWindow } from '@/server/cgm/thresholds';
+import { readingsFromWire } from '@/lib/meal-response';
 import { patternDefs } from '@/server/cgm/patterns';
 import { clientKey, rateLimit } from '@/server/rate-limit';
 
@@ -56,7 +59,8 @@ function safe(text: string): { ok: boolean; hit?: string } {
 }
 
 interface Body {
-  result?: AnalysisResult;
+  /** `metrics` is null for a window the browser cannot summarise — see windowFrom below. */
+  result?: Omit<AnalysisResult, 'metrics'> & { metrics: AnalysisResult['metrics'] | null };
   meds?: GlucoseLoweringMeds;
   markers?: MealMarker[];
   responses?: MealResponse[];
@@ -66,6 +70,14 @@ interface Body {
   /** true only when the coach pressed the button, so the findings render without
    *  ever calling out to a third party on their own */
   wantNarrative?: boolean;
+  /**
+   * The span on screen. Required whenever `result.metrics` is absent — a
+   * hand-picked or zoomed range, which the browser cannot summarise itself
+   * because the maths lives here. Given these, the window's figures are worked
+   * out from the readings inside it and handed back for the cards to show.
+   */
+  windowFrom?: number;
+  windowTo?: number;
 }
 
 export async function POST(req: Request) {
@@ -77,11 +89,44 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ narrative: null, reasonTh: t('คำขอไม่ถูกต้อง', 'Malformed request.') }, { status: 400 });
   }
-  if (!body.result?.metrics) {
+  if (!body.result?.series) {
     return NextResponse.json({ narrative: null, reasonTh: t('ยังไม่มีผลวิเคราะห์', 'No analysis to summarise yet.') }, { status: 400 });
   }
 
-  const interpretation = interpret(body.result, {
+  /**
+   * A window with no figures of its own gets them computed here, from the
+   * readings inside it. Falling back to the whole file's metrics instead — which
+   * is what used to happen — was not a smaller mistake than it sounds: interpret()
+   * clips its event scan to the span of whatever metrics it is handed, so one
+   * substituted value made every finding underneath describe the entire wear
+   * while the heading named a single evening.
+   */
+  let windowMetrics: ReturnType<typeof computeMetrics> = null;
+  let windowGate: ReturnType<typeof gateForWindow> | null = null;
+  if (!body.result.metrics) {
+    if (body.windowFrom == null || body.windowTo == null) {
+      return NextResponse.json({ narrative: null, reasonTh: t('ยังไม่มีผลวิเคราะห์', 'No analysis to summarise yet.') }, { status: 400 });
+    }
+    const from = body.windowFrom;
+    const to = body.windowTo;
+    const slice = readingsFromWire(body.result.series).filter((r) => r.t >= from && r.t <= to);
+    windowMetrics = computeMetrics(slice, locale);
+    if (!windowMetrics) {
+      return NextResponse.json(
+        { narrative: null, reasonTh: t('ช่วงนี้ไม่มีค่าที่ใช้คำนวณได้', 'No usable readings in this window.') },
+        { status: 400 },
+      );
+    }
+    windowGate = gateForWindow(body.result.quality.spanDays, body.result.quality.capturePct, locale);
+  }
+
+  const metrics = body.result.metrics ?? windowMetrics;
+  if (!metrics) {
+    return NextResponse.json({ narrative: null, reasonTh: t('ยังไม่มีผลวิเคราะห์', 'No analysis to summarise yet.') }, { status: 400 });
+  }
+  const forRules: AnalysisResult = { ...body.result, metrics };
+
+  const interpretation = interpret(forRules, {
     locale,
     meds: body.meds ?? 'unknown',
     markers: body.markers,
@@ -95,17 +140,17 @@ export async function POST(req: Request) {
   const model = (body.aiModel ?? '').trim() || FALLBACK_MODEL;
 
   if (!body.wantNarrative) {
-    return NextResponse.json({ interpretation, narrative: null, reasonTh: null });
+    return NextResponse.json({ interpretation, windowMetrics, windowGate, narrative: null, reasonTh: null });
   }
   if (process.env.UPCGM_AI_DISABLED === '1') {
     return NextResponse.json({
-      interpretation, narrative: null,
+      interpretation, windowMetrics, windowGate, narrative: null,
       reasonTh: 'ปิดการใช้ AI ไว้ที่ระบบ — ข้อค้นพบทั้งหมดด้านล่างคำนวณจากเกณฑ์ตรง ๆ อยู่แล้ว',
     });
   }
   if (!key) {
     return NextResponse.json({
-      interpretation, narrative: null,
+      interpretation, windowMetrics, windowGate, narrative: null,
       reasonTh: 'ยังไม่ได้ใส่ API key — ไปที่หน้าตั้งค่าเพื่อเปิดใช้สรุปด้วย AI (ไม่ใส่ก็ใช้งานได้ครบทุกอย่าง)',
     });
   }
@@ -115,13 +160,13 @@ export async function POST(req: Request) {
   const verdict = rateLimit(`ai:${clientKey(req.headers)}`, 20, 3600);
   if (!verdict.allowed) {
     return NextResponse.json({
-      interpretation,
+      interpretation, windowMetrics, windowGate,
       narrative: null,
       reasonTh: `ใช้สรุปด้วย AI ครบโควตาชั่วโมงนี้แล้ว รออีก ${Math.ceil(verdict.retryAfterSeconds / 60)} นาที`,
     });
   }
 
-  const m = body.result.metrics;
+  const m = forRules.metrics;
   const q = body.result.quality;
   // Only aggregates leave this server. The 3,000-point series never does.
   const facts = [
@@ -220,21 +265,22 @@ export async function POST(req: Request) {
     const text = (json.candidates?.[0]?.content?.parts ?? [])
       .map((p) => p.text ?? '').join('\n').trim();
     if (!text) {
-      return NextResponse.json({ interpretation, narrative: null, reasonTh: 'ไม่ได้ข้อความกลับมา' });
+      return NextResponse.json({ interpretation, windowMetrics, windowGate, narrative: null, reasonTh: 'ไม่ได้ข้อความกลับมา' });
     }
 
     const check = safe(text);
     if (!check.ok) {
       console.warn('[ai] blocked narrative, matched:', check.hit);
       return NextResponse.json({
+      windowMetrics, windowGate,
         interpretation,
         narrative: null,
         reasonTh: 'ข้อความที่ได้กลับมาแตะเรื่องที่อยู่นอกขอบเขตของเครื่องมือนี้ จึงไม่แสดง — ข้อค้นพบตามเกณฑ์ด้านล่างยังใช้ได้ตามปกติ',
       });
     }
 
-    return NextResponse.json({ interpretation, narrative: text, reasonTh: null });
+    return NextResponse.json({ interpretation, windowMetrics, windowGate, narrative: text, reasonTh: null });
   } catch {
-    return NextResponse.json({ interpretation, narrative: null, reasonTh: 'สรุปด้วย AI ใช้เวลานานเกินไป — ข้ามไปก่อน' });
+    return NextResponse.json({ interpretation, windowMetrics, windowGate, narrative: null, reasonTh: 'สรุปด้วย AI ใช้เวลานานเกินไป — ข้ามไปก่อน' });
   }
 }

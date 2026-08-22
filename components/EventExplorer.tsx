@@ -179,6 +179,7 @@ export default function EventExplorer({
                           from={open.fromT}
                           to={open.toT}
                           height={230}
+                          showHint={false}
                         />
                       </div>
 
